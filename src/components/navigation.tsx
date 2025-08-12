@@ -58,7 +58,7 @@ export function Navigation() {
                 onClick={() => setIsOpen(false)}
               >
                 <Mic2 className="h-6 w-6 text-primary" />
-                <span className="font-bold">VoiceGig</span>
+                <span className="font-bold">Liva</span>
               </Link>
             </div>
             <div className="my-4 h-[calc(100vh-8rem)] pb-10 pl-6">
@@ -80,7 +80,7 @@ export function Navigation() {
           <div className="w-full flex-1 md:w-auto md:flex-none">
             <Link className="mr-6 flex items-center space-x-2 md:hidden" href="/">
               <Mic2 className="h-6 w-6 text-primary" />
-              <span className="font-bold">VoiceGig</span>
+              <span className="font-bold">Liva</span>
             </Link>
           </div>
           <nav className="flex items-center space-x-2">

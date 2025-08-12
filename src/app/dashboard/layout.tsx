@@ -45,7 +45,7 @@ function DashboardNav() {
       <div className="container flex h-16 items-center">
         <Link className="mr-6 flex items-center space-x-2" href="/dashboard">
           <Mic2 className="h-6 w-6 text-primary" />
-          <span className="font-bold">VoiceGig</span>
+          <span className="font-bold">Liva</span>
         </Link>
 
         <div className="hidden md:flex items-center space-x-6 text-sm font-medium">

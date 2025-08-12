@@ -125,7 +125,7 @@ export default function DashboardPage() {
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">
-          Welcome back, {user?.user_metadata?.full_name || 'Voice Actor'}!
+          Welcome back {user?.user_metadata?.full_name }!
         </h1>
         <p className="text-muted-foreground">
           Here's your earnings and activity overview.
