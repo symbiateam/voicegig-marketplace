@@ -174,6 +174,7 @@ export default function JobDetailsPage() {
         job_id: job.id,
         user_id: user.id,
         file_url: publicUrl,
+        file_path: fileName, // Add the file path (storage bucket path)
         file_type: selectedFile.type,
         notes: notes.trim() || null,
         status: 'submitted'
