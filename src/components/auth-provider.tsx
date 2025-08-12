@@ -8,12 +8,14 @@ type AuthContextType = {
   user: User | null
   loading: boolean
   signOut: () => Promise<void>
+  updateProfile?: (data: any) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
+  updateProfile: async () => {}
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -42,8 +44,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  const updateProfile = async (data: any) => {
+    if (!user) return
+    
+    try {
+      // Update user metadata
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          ...data
+        }
+      })
+      
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      throw error
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

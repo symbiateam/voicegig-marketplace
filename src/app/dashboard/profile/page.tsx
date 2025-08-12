@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,7 +53,7 @@ export default function ProfilePage() {
       console.log("🔍 Fetching Stripe account status...");
 
       const { data: profiles, error } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .select('stripe_account_id')
         .eq('id', user.id)
         .single()
@@ -106,9 +107,9 @@ export default function ProfilePage() {
         throw error;
       }
 
-      // Also update the user_profiles table
+      // Also update the profiles table
       const { error: profileError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .upsert({
           id: user?.id,
           full_name: profileData.full_name,

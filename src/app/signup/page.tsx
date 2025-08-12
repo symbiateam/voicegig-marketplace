@@ -83,7 +83,7 @@ export default function SignUpPage() {
             </div>
             <CardTitle className="text-2xl text-center">Create an account</CardTitle>
             <CardDescription className="text-center">
-              Join VoiceGig and start earning with your voice
+              Join Liva and start earning with your voice
             </CardDescription>
           </CardHeader>
           <CardContent>
