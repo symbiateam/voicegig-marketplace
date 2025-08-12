@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Navigation } from '@/components/navigation'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Mic2, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -79,7 +79,6 @@ export default function SignUpPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-center mb-4">
-              <Mic2 className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="text-2xl text-center">Create an account</CardTitle>
             <CardDescription className="text-center">

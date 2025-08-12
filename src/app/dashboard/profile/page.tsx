@@ -277,7 +277,7 @@ export default function ProfilePage() {
             <form onSubmit={handleProfileUpdate} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
+                  <Label htmlFor="full_name">Your Name</Label>
                   <Input
                     id="full_name"
                     value={profileData.full_name}

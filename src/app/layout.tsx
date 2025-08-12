@@ -1,14 +1,17 @@
 import React from 'react'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Space_Grotesk } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
 
-const inter = Inter({ subsets: ['latin'] })
+const spaceGrotesk = Space_Grotesk({ 
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700']
+})
 
 export const metadata: Metadata = {
-  title: 'VoiceGig - Freelance Voice Work Marketplace',
-  description: 'Connect with voice actors and content creators. Find freelance work for voice-overs, narrations, and audio content.',
+  title: 'Liva AI - Capturing Human Emotion and Experience',
+  description: 'Building the world\'s richest dataset of real human expressions for next-generation AI.',
 }
 
 export default function RootLayout({
@@ -18,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={spaceGrotesk.className}>
         {children}
         <Toaster richColors position="top-right" />
       </body>
