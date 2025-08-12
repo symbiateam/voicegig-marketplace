@@ -16,12 +16,6 @@ export function Navigation() {
           Liva AI
         </Link>
 
-        <nav className="hidden md:flex gap-8 text-[var(--text-color)] font-medium">
-          <Link href="#features" className="hover:text-[var(--primary-color)]">Features</Link>
-          <Link href="#how-it-works" className="hover:text-[var(--primary-color)]">How It Works</Link>
-          <Link href="#pricing" className="hover:text-[var(--primary-color)]">Pricing</Link>
-        </nav>
-
 
         {/* Mobile */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>

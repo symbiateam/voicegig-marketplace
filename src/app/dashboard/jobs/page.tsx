@@ -104,7 +104,7 @@ export default function JobsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2">Available Jobs</h1>
         <p className="text-muted-foreground">
-          Find voice work opportunities from our database of {jobs.length} real jobs.
+          Find opportunities.
         </p>
       </div>
 
