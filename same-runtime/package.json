@@ -1,0 +1,8 @@
+{
+  "name": "same-runtime",
+  "version": "1.0.0",
+  "description": "Compatibility layer for JSX runtime",
+  "main": "dist/index.js",
+  "type": "module",
+  "private": true
+}
