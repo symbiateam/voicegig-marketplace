@@ -47,7 +47,6 @@ export default function DashboardPage() {
       const { data: walletData } = await supabase
         .from('wallet_balances')
         .select('available, total_earned')
-        .eq('user_id', user?.id)
         .single()
 
       // Fetch submissions
