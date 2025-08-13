@@ -1,16 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Navigation } from '@/components/navigation'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Loader2, CheckCircle, Mail } from 'lucide-react'
+import { Loader2, CheckCircle, Mail, ExternalLink } from 'lucide-react'
 
 export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -21,6 +21,12 @@ export default function SignUpPage() {
     password: '',
     fullName: '',
     confirmPassword: ''
+  })
+  const [agreements, setAgreements] = useState({
+    privacyPolicy: false,
+    termsOfUse: false,
+    eula: false,
+    acceptableUse: false
   })
   const router = useRouter()
 
@@ -41,6 +47,12 @@ export default function SignUpPage() {
 
     if (formData.password.length < 6) {
       toast.error('Password must be at least 6 characters')
+      return
+    }
+    
+    // Check if all agreements are accepted
+    if (!agreements.privacyPolicy || !agreements.termsOfUse || !agreements.eula || !agreements.acceptableUse) {
+      toast.error('You must agree to all terms and policies to create an account')
       return
     }
 
@@ -80,17 +92,18 @@ export default function SignUpPage() {
 
       <div className="flex flex-1 items-center justify-center py-12 px-4">
         {signupComplete ? (
-          <Card className="w-full max-w-md">
-            <CardHeader className="space-y-1">
+          <div className="w-full max-w-md space-y-6">
+            <div className="space-y-4 text-center">
               <div className="flex items-center justify-center mb-4 text-green-500">
                 <CheckCircle size={64} />
               </div>
-              <CardTitle className="text-2xl text-center">Check Your Email</CardTitle>
-              <CardDescription className="text-center text-base">
+              <h1 className="text-2xl font-semibold">Check Your Email</h1>
+              <p className="text-base">
                 We've sent a confirmation email to <span className="font-bold">{userEmail}</span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            
+            <div className="space-y-6">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                 <h3 className="font-medium text-blue-800 mb-2">Important:</h3>
                 <p className="text-blue-700 text-sm">
@@ -111,20 +124,18 @@ export default function SignUpPage() {
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : (
-          <Card className="w-full max-w-md">
-            <CardHeader className="space-y-1">
-              <div className="flex items-center justify-center mb-4">
-              </div>
-              <CardTitle className="text-2xl text-center">Create an account</CardTitle>
-              <CardDescription className="text-center">
+          <div className="w-full max-w-md space-y-6">
+            <div className="space-y-4 text-center">
+              <h1 className="text-2xl font-semibold">Create an account</h1>
+              <p>
                 Join Liva and start earning with your voice
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              </p>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input
@@ -173,6 +184,82 @@ export default function SignUpPage() {
                     required
                   />
                 </div>
+                
+                <div className="space-y-4 pt-2">
+                  <div className="text-sm font-medium">Legal Agreements</div>
+                  
+                  <div className="flex items-start space-x-2">
+                    <Checkbox 
+                      id="privacy-policy" 
+                      checked={agreements.privacyPolicy}
+                      onCheckedChange={(checked: boolean) => 
+                        setAgreements(prev => ({ ...prev, privacyPolicy: checked }))
+                      }
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <label
+                        htmlFor="privacy-policy"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-1"
+                      >
+                        I agree to the <Link href="https://app.termly.io/policy-viewer/policy.html?policyUUID=71d7e121-da10-46c9-b5f5-9397578a480b" target="_blank" className="text-primary hover:underline inline-flex items-center">Privacy Policy <ExternalLink className="h-3 w-3" /></Link>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-2">
+                    <Checkbox 
+                      id="terms-of-use" 
+                      checked={agreements.termsOfUse}
+                      onCheckedChange={(checked: boolean) => 
+                        setAgreements(prev => ({ ...prev, termsOfUse: checked }))
+                      }
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <label
+                        htmlFor="terms-of-use"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-1"
+                      >
+                        I agree to the <Link href="https://app.termly.io/policy-viewer/policy.html?policyUUID=1f9c2dc0-d885-46ac-8971-6a84adced52e" target="_blank" className="text-primary hover:underline inline-flex items-center">Terms of Use <ExternalLink className="h-3 w-3" /></Link>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-2">
+                    <Checkbox 
+                      id="eula" 
+                      checked={agreements.eula}
+                      onCheckedChange={(checked: boolean) => 
+                        setAgreements(prev => ({ ...prev, eula: checked }))
+                      }
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <label
+                        htmlFor="eula"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-1"
+                      >
+                        I agree to the <Link href="https://app.termly.io/policy-viewer/policy.html?policyUUID=6d297fad-15f6-4b9e-a83a-9d4466289824" target="_blank" className="text-primary hover:underline inline-flex items-center">End User License Agreement <ExternalLink className="h-3 w-3" /></Link>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-2">
+                    <Checkbox 
+                      id="acceptable-use" 
+                      checked={agreements.acceptableUse}
+                      onCheckedChange={(checked: boolean) => 
+                        setAgreements(prev => ({ ...prev, acceptableUse: checked }))
+                      }
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <label
+                        htmlFor="acceptable-use"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-1"
+                      >
+                        I agree to the <Link href="https://app.termly.io/policy-viewer/policy.html?policyUUID=1f8bce7b-f6c8-47ff-a4cd-e7d2708be99b" target="_blank" className="text-primary hover:underline inline-flex items-center">Acceptable Use Policy <ExternalLink className="h-3 w-3" /></Link>
+                      </label>
+                    </div>
+                  </div>
+                </div>
                 <Button type="submit" className="w-full" variant="cta" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create Account
@@ -184,8 +271,7 @@ export default function SignUpPage() {
                   Sign in
                 </Link>
               </div>
-            </CardContent>
-          </Card>
+            </div>
         )}
       </div>
     </div>
