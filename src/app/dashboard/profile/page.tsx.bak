@@ -1,0 +1,598 @@
+'use client'
+
+import React from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { useAuth } from '@/components/auth-provider'
+import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
+import Script from 'next/script'
+import {
+  User,
+  Mail,
+  CreditCard,
+  ExternalLink,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  DollarSign,
+  Settings
+} from 'lucide-react'
+
+type StripeAccount = {
+  id: string
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted: boolean
+  created: number
+}
+
+export default function ProfilePage() {
+  const { user, updateProfile } = useAuth()
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [stripeLoading, setStripeLoading] = useState(false)
+  const [paypalLoading, setPaypalLoading] = useState(false)
+  const [stripeAccount, setStripeAccount] = useState<StripeAccount | null>(null)
+  const [paypalAccount, setPaypalAccount] = useState<{email: string, verified: boolean} | null>(null)
+  const [profileData, setProfileData] = useState({
+    full_name: user?.user_metadata?.full_name || '',
+    email: user?.email || '',
+  })
+
+  console.log("👤 Profile page loaded", { user: user?.id, email: user?.email });
+
+  // Fetch user's payment accounts status
+  const fetchAccountStatus = async () => {
+    if (!user) return
+
+    try {
+      console.log("🔍 Fetching account status...");
+
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('stripe_account_id, paypal_email, paypal_verified')
+        .eq('id', user.id)
+        .single()
+
+      console.log("📊 User profile query result:", { profiles, error });
+
+      if (error) {
+        console.error("Error fetching profile:", error)
+        return
+      }
+
+      // Handle Stripe account
+      if (profiles?.stripe_account_id) {
+        setStripeLoading(true)
+        const response = await fetch('/api/stripe/account-status', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const accountData = await response.json()
+          setStripeAccount(accountData)
+        } else {
+          console.error("Error fetching Stripe account status")
+        }
+        setStripeLoading(false)
+      } else {
+        setStripeAccount(null);
+      }
+      
+      // Handle PayPal account
+      if (profiles?.paypal_email) {
+        setPaypalAccount({
+          email: profiles.paypal_email,
+          verified: profiles.paypal_verified || false
+        })
+      } else {
+        setPaypalAccount(null);
+      }
+    } catch (error) {
+      console.error('Error fetching Stripe account:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      fetchAccountStatus()
+    }
+  }, [user])
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      console.log("💾 Updating user profile...", profileData);
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: profileData.full_name
+        }
+      })
+
+      if (error) {
+        console.error("❌ Profile update error:", error);
+        throw error;
+      }
+
+      // Also update the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user?.id,
+          full_name: profileData.full_name,
+          email: profileData.email,
+          updated_at: new Date().toISOString()
+        })
+
+      if (profileError) {
+        console.error("❌ Profile table update error:", profileError);
+        // Don't throw here, as the auth update succeeded
+      }
+
+      console.log("✅ Profile updated successfully");
+      toast.success('Profile updated successfully!')
+
+      if (updateProfile) {
+        updateProfile({ full_name: profileData.full_name })
+      }
+    } catch (error: any) {
+      console.error('Error updating profile:', error)
+      toast.error(error.message || 'Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStripeConnect = async () => {
+    if (!user) return
+
+    setStripeLoading(true)
+
+    try {
+      console.log("🚀 Starting Stripe Connect onboarding...");
+
+      const { data, error } = await supabase.auth.getSession()
+      if (error || !data.session) {
+        throw new Error('No active session')
+      }
+
+      console.log("📤 Calling Stripe Connect API...");
+
+      const response = await fetch('/api/stripe/connect-create-account', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${data.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const result = await response.json()
+
+      console.log("📊 Stripe Connect response:", { status: response.status, result });
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create Stripe account')
+      }
+
+      if (result.account_link_url) {
+        console.log("🔗 Redirecting to Stripe onboarding:", result.account_link_url);
+        // Redirect to Stripe onboarding
+        window.location.href = result.account_link_url
+      } else {
+        toast.success('Stripe account created successfully!')
+        fetchAccountStatus() // Refresh the account status
+      }
+    } catch (error: any) {
+      console.error('Error connecting to Stripe:', error)
+      toast.error(error.message || 'Failed to connect to Stripe')
+    } finally {
+      setStripeLoading(false)
+    }
+  }
+
+  const handleStripeManage = async () => {
+    if (!user || !stripeAccount) return
+
+    setStripeLoading(true)
+
+    try {
+      console.log("🚀 Getting Stripe dashboard link...");
+
+      const { data, error } = await supabase.auth.getSession()
+      if (error || !data.session) {
+        throw new Error('No active session')
+      }
+
+      const response = await fetch('/api/stripe/connect-onboard-link', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${data.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const result = await response.json()
+
+      console.log("📊 Stripe dashboard response:", { status: response.status, result });
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to get Stripe dashboard link')
+      }
+
+      if (result.url) {
+        console.log("🔗 Opening Stripe dashboard:", result.url);
+        window.open(result.url, '_blank')
+      }
+    } catch (error: any) {
+      console.error('Error accessing Stripe dashboard:', error)
+      toast.error(error.message || 'Failed to access Stripe dashboard')
+    } finally {
+      setStripeLoading(false)
+    }
+  }
+
+  const getStripeStatusBadge = () => {
+    if (!stripeAccount) return null
+
+    if (stripeAccount.charges_enabled && stripeAccount.payouts_enabled) {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+          Active
+        </Badge>
+      )
+    } else if (stripeAccount.details_submitted) {
+      return (
+        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 hover:bg-yellow-50">
+          Pending
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
+          Incomplete
+        </Badge>
+      )
+    }
+  }
+
+  const handlePayPalConnect = async () => {
+    if (!user) return
+
+    try {
+      setPaypalLoading(true)
+      
+      // Initialize PayPal Login
+      // This uses the PayPal Login Button SDK to authenticate the user
+      // and get their verified PayPal email
+      
+      // Create a return URL that includes the user ID
+      const returnUrl = `${window.location.origin}/api/paypal/login/callback?user_id=${user.id}`
+      
+      // Open PayPal login in a popup window
+      window.open(
+        `https://www.paypal.com/signin/authorize?client_id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || 'AQTPG-xEOF6Ig3tZP7RXiIu-mOQ1bL-EvwFqQdqYIBFJSYg_f1Ic7hm_EgoCsLZ-x5dNxInYJG_ctS60'}&response_type=code&scope=openid email&redirect_uri=${encodeURIComponent(returnUrl)}`,
+        'paypal-login',
+        'width=500,height=600'
+      )
+      
+      // We'll handle the callback in the /api/paypal/login/callback route
+      // The callback will update the user's profile with their verified PayPal email
+      
+      toast.info('Please complete the PayPal login process in the popup window')
+    } catch (error: any) {
+      console.error('Error connecting PayPal account:', error)
+      toast.error(error.message || 'Failed to connect PayPal account')
+    } finally {
+      setPaypalLoading(false)
+    }
+  }
+
+  return (
+    <div className="container py-8">
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your account settings and payment preferences
+          </p>
+        </div>
+
+        {/* Profile Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <User className="w-5 h-5" />
+              <span>Personal Information</span>
+            </CardTitle>
+            <CardDescription>
+              Update your personal details and contact information
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleProfileUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Your Name</Label>
+                  <Input
+                    id="full_name"
+                    value={profileData.full_name}
+                    onChange={(e) => setProfileData(prev => ({
+                      ...prev,
+                      full_name: e.target.value
+                    }))}
+                    placeholder="Enter your full name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileData.email}
+                    disabled
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Email cannot be changed here. Contact support if needed.
+                  </p>
+                </div>
+              </div>
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Profile
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Stripe Connect Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <CreditCard className="w-5 h-5" />
+              <span>Payment Setup</span>
+            </CardTitle>
+            <CardDescription>
+              Connect your Stripe account to receive payments for completed work
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {stripeAccount ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-medium">Stripe Account Connected</h3>
+                      {getStripeStatusBadge()}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Account ID: {stripeAccount.id}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 text-sm">
+                      {stripeAccount.charges_enabled ? (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      )}
+                      <span>Charges</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stripeAccount.charges_enabled ? 'Enabled' : 'Disabled'}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 text-sm">
+                      {stripeAccount.payouts_enabled ? (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      )}
+                      <span>Payouts</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stripeAccount.payouts_enabled ? 'Enabled' : 'Disabled'}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 text-sm">
+                      {stripeAccount.details_submitted ? (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      )}
+                      <span>Details</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stripeAccount.details_submitted ? 'Submitted' : 'Pending'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2">
+                  <Button onClick={handleStripeManage} disabled={stripeLoading} variant="outline">
+                    {stripeLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Settings className="mr-2 h-4 w-4" />
+                    Manage Account
+                  </Button>
+                  <Button onClick={() => router.push('/dashboard/earnings')}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    View Earnings
+                  </Button>
+                </div>
+              </div>
+
+              {/* PayPal Integration */}
+              <div className="space-y-4 mt-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">PayPal Account</h3>
+                  {paypalAccount ? (
+            <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+              Connected
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 hover:bg-yellow-50">
+              Not Connected
+            </Badge>
+          )}
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          {stripeAccount ? (
+            <p>Your Stripe account is connected and ready to receive payments.</p>
+          ) : (
+            <p>Connect your Stripe account to receive payments for your voice work.</p>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-4">
+          {stripeLoading ? (
+            <Button disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading...
+            </Button>
+          ) : stripeAccount ? (
+            <Button
+              variant="outline"
+              onClick={() => window.open('https://dashboard.stripe.com', '_blank')}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Manage Stripe Account
+            </Button>
+          ) : (
+            <Button onClick={handleStripeConnect}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Connect Stripe Account
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Separator className="my-6" />
+      
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">PayPal Account</h3>
+          {paypalAccount ? (
+            <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+              Connected
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 hover:bg-yellow-50">
+              Not Connected
+            </Badge>
+          )}
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          {paypalAccount ? (
+            <p>Your PayPal account ({paypalAccount.email}) is connected and ready to receive payments.</p>
+          ) : (
+            <p>Connect your PayPal account to receive payments for your voice work.</p>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-4">
+          {paypalLoading ? (
+            <Button disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading...
+            </Button>
+          ) : paypalAccount ? (
+            <Button
+              variant="outline"
+              onClick={() => window.open('https://www.paypal.com/myaccount/summary', '_blank')}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Manage PayPal Account
+            </Button>
+          ) : (
+            <div id="paypal-button-container" className="mt-2">
+              <Button onClick={handlePayPalConnect} className="bg-[#0070ba] hover:bg-[#005ea6]">
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 0 0-.794.68l-.04.22-.63 4.028-.03.17a.804.804 0 0 1-.794.679h-2.52a.483.483 0 0 1-.477-.558l.922-5.832-.023.124a.804.804 0 0 1 .792-.939h1.796c3.238 0 5.775-1.314 6.514-5.12.257-1.313.193-2.447-.3-3.327" fill="#fff"/>
+                  <path d="M18.452 7.532c-.1-.3-.232-.557-.386-.78-.106-.151-.223-.283-.346-.398-.388-.362-.853-.64-1.384-.843-.045-.017-.09-.033-.135-.05-.156-.053-.315-.1-.48-.142-.165-.042-.33-.08-.5-.113-.8-.16-1.656-.24-2.55-.24h-4.95a.97.97 0 0 0-.958.82l-2.1 13.43a.569.569 0 0 0 .565.648h2.52l.634-4.02c.1-.624.635-1.078 1.267-1.078h.5c3.237 0 5.774-1.314 6.514-5.12.257-1.313.19-2.445-.211-3.314z" fill="#fff"/>
+                </svg>
+                Connect PayPal Account
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+      </CardContent>
+      </Card>
+      ) : (
+              <div className="text-center space-y-4 py-8">
+                <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                  <CreditCard className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-medium">Connect Your Stripe Account</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    To receive payments for your voice work, you need to connect a Stripe account.
+                    This allows us to securely transfer your earnings directly to your bank account.
+                  </p>
+                </div>
+                <Button onClick={handleStripeConnect} disabled={stripeLoading} size="lg">
+                  {stripeLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Connect Stripe Account
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  You'll be redirected to Stripe to complete the setup process
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Account Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Actions</CardTitle>
+            <CardDescription>
+              Additional account management options
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h4 className="font-medium">Change Password</h4>
+                <p className="text-sm text-muted-foreground">
+                  Update your account password for security
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => {
+                // Trigger password reset email
+                supabase.auth.resetPasswordForEmail(user?.email || '')
+                toast.success('Password reset email sent!')
+              }}>
+                <Mail className="mr-2 h-4 w-4" />
+                Reset Password
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

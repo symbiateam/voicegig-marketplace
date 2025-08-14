@@ -133,6 +133,29 @@ export type Database = {
           created_at?: string
         }
       }
+      balances: {
+        Row: {
+          user_id: string
+          available: number
+          pending_payout: number
+          total_earned: number
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          available: number
+          pending_payout?: number
+          total_earned: number
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          available?: number
+          pending_payout?: number
+          total_earned?: number
+          updated_at?: string
+        }
+      }
       payouts: {
         Row: {
           id: string
@@ -164,14 +187,7 @@ export type Database = {
       }
     }
     Views: {
-      wallet_balances: {
-        Row: {
-          user_id: string
-          available: number
-          pending: number
-          total_earned: number
-        }
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never

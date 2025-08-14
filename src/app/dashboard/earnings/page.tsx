@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -17,7 +18,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Mail
 } from 'lucide-react'
 
 type WalletBalance = {
@@ -28,10 +30,23 @@ type WalletBalance = {
 
 type Payout = {
   id: string
+  user_id: string
   amount: number
-  status: 'processing' | 'paid' | 'failed'
+  status: string
   created_at: string
-  processed_at: string | null
+  payout_method?: string
+  payout_email?: string
+  payout_id?: string
+}
+
+type StripePayoutBody = {
+  amount: number
+}
+
+type PayPalPayoutBody = {
+  amount: number
+  email: string
+  user_id: string
 }
 
 export default function EarningsPage() {
@@ -40,6 +55,8 @@ export default function EarningsPage() {
   const [payouts, setPayouts] = useState<Payout[]>([])
   const [loading, setLoading] = useState(true)
   const [payoutAmount, setPayoutAmount] = useState('')
+  const [payoutMethod, setPayoutMethod] = useState('stripe') // 'stripe' or 'paypal'
+  const [paypalEmail, setPaypalEmail] = useState('')
   const [requestingPayout, setRequestingPayout] = useState(false)
   const [connectingStripe, setConnectingStripe] = useState(false)
   const [stripeConnected, setStripeConnected] = useState(false)
@@ -73,13 +90,16 @@ export default function EarningsPage() {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('stripe_account_id')
+        .select('stripe_account_id, paypal_email')
         .eq('id', user?.id)
         .single()
 
       setStripeConnected(!!profile?.stripe_account_id)
+      if (profile?.paypal_email) {
+        setPaypalEmail(profile.paypal_email)
+      }
     } catch (error) {
-      console.error('Error checking Stripe connection:', error)
+      console.error('Error checking payment connections:', error)
     }
   }, [user])
 
@@ -143,6 +163,11 @@ export default function EarningsPage() {
       toast.error('Please enter a valid amount')
       return
     }
+    
+    if (payoutMethod === 'paypal' && !paypalEmail) {
+      toast.error('Please enter your PayPal email')
+      return
+    }
 
     if (!balance || amount > balance.available) {
       toast.error('Insufficient available balance')
@@ -159,15 +184,33 @@ export default function EarningsPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
 
-      const response = await fetch('/api/stripe/cashout', {
+      let endpoint = '/api/stripe/cashout'
+      let body: StripePayoutBody | PayPalPayoutBody = {
+        amount: amount * 100, // Convert to cents for Stripe
+      }
+      
+      if (payoutMethod === 'paypal') {
+        endpoint = '/api/paypal/payout'
+        body = {
+          amount: amount,
+          email: paypalEmail,
+          user_id: user?.id || ''
+        } as PayPalPayoutBody
+        
+        // Save PayPal email to profile if it's new or changed
+        await supabase
+          .from('profiles')
+          .update({ paypal_email: paypalEmail })
+          .eq('id', user?.id)
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amount_dollars: amount
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -295,25 +338,61 @@ export default function EarningsPage() {
                   <CheckCircle className="h-4 w-4 mr-2" />
                   <span className="text-sm">Stripe account connected</span>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Payout Amount</Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="0.00"
-                      value={payoutAmount}
-                      onChange={(e) => setPayoutAmount(e.target.value)}
-                      className="pl-9"
-                      max={balance?.available || 0}
-                      step="0.01"
-                    />
+                
+                <div className="space-y-4 mb-4">
+                  <div>
+                    <Label className="mb-2 block">Payment Method</Label>
+                    <RadioGroup 
+                      value={payoutMethod} 
+                      onValueChange={setPayoutMethod}
+                      className="flex flex-col space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="stripe" id="stripe" />
+                        <Label htmlFor="stripe" className="cursor-pointer">Stripe (Bank Account)</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="paypal" id="paypal" />
+                        <Label htmlFor="paypal" className="cursor-pointer">PayPal</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Available: ${balance?.available?.toFixed(2) || '0.00'}
-                  </p>
+                  
+                  {payoutMethod === 'paypal' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="paypal-email">PayPal Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="paypal-email"
+                          type="email"
+                          placeholder="your-email@example.com"
+                          value={paypalEmail}
+                          onChange={(e) => setPaypalEmail(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Payout Amount</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="amount"
+                        type="number"
+                        placeholder="0.00"
+                        value={payoutAmount}
+                        onChange={(e) => setPayoutAmount(e.target.value)}
+                        className="pl-9"
+                        max={balance?.available || 0}
+                        step="0.01"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Available: ${balance?.available?.toFixed(2) || '0.00'}
+                    </p>
+                  </div>
                 </div>
 
                 <Button
