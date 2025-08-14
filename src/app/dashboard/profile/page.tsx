@@ -4,6 +4,7 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import Script from 'next/script'
 import {
   User,
   Mail,
@@ -37,7 +39,9 @@ export default function ProfilePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [stripeLoading, setStripeLoading] = useState(false)
+  const [paypalLoading, setPaypalLoading] = useState(false)
   const [stripeAccount, setStripeAccount] = useState<StripeAccount | null>(null)
+  const [paypalAccount, setPaypalAccount] = useState<{email: string, verified: boolean} | null>(null)
   const [profileData, setProfileData] = useState({
     full_name: user?.user_metadata?.full_name || '',
     email: user?.email || '',
@@ -45,40 +49,55 @@ export default function ProfilePage() {
 
   console.log("👤 Profile page loaded", { user: user?.id, email: user?.email });
 
-  // Fetch user's Stripe account status
-  const fetchStripeAccount = async () => {
+  // Fetch user's payment accounts status
+  const fetchAccountStatus = async () => {
     if (!user) return
 
     try {
-      console.log("🔍 Fetching Stripe account status...");
+      console.log("🔍 Fetching account status...");
 
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('stripe_account_id')
+        .select('stripe_account_id, paypal_email, paypal_verified')
         .eq('id', user.id)
         .single()
 
       console.log("📊 User profile query result:", { profiles, error });
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-        console.error("❌ Error fetching profile:", error);
-        return;
+      if (error) {
+        console.error("Error fetching profile:", error)
+        return
       }
 
+      // Handle Stripe account
       if (profiles?.stripe_account_id) {
-        console.log("✅ User has Stripe account:", profiles.stripe_account_id);
-        // For now, we'll show that they're connected
-        // In a real implementation, you'd verify the account status via Stripe API
-        setStripeAccount({
-          id: profiles.stripe_account_id,
-          charges_enabled: true,
-          payouts_enabled: true,
-          details_submitted: true,
-          created: Date.now()
-        });
+        setStripeLoading(true)
+        const response = await fetch('/api/stripe/account-status', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const accountData = await response.json()
+          setStripeAccount(accountData)
+        } else {
+          console.error("Error fetching Stripe account status")
+        }
+        setStripeLoading(false)
       } else {
-        console.log("⚠️ User does not have Stripe account");
         setStripeAccount(null);
+      }
+      
+      // Handle PayPal account
+      if (profiles?.paypal_email) {
+        setPaypalAccount({
+          email: profiles.paypal_email,
+          verified: profiles.paypal_verified || false
+        })
+      } else {
+        setPaypalAccount(null);
       }
     } catch (error) {
       console.error('Error fetching Stripe account:', error)
@@ -86,7 +105,9 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    fetchStripeAccount()
+    if (user) {
+      fetchAccountStatus()
+    }
   }, [user])
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -173,7 +194,7 @@ export default function ProfilePage() {
         window.location.href = result.account_link_url
       } else {
         toast.success('Stripe account created successfully!')
-        fetchStripeAccount() // Refresh the account status
+        fetchAccountStatus() // Refresh the account status
       }
     } catch (error: any) {
       console.error('Error connecting to Stripe:', error)
