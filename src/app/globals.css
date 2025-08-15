@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,8 +15,19 @@
     --light-text: #4a5568;
     --background: #f9fafb;
     --light-background: #f3f4f6;
-    --border-color: #e5e7eb;
+    --border-color: #dfe6e9;
+    --card-bg: #ffffff;
+    --card-hover: #f8f9ff;
+    --card-accent: #f0f2ff;
     --animation-dot-size: 10px;
+    
+    /* Category colors */
+    --category-audio: #6c5ce7; /* Purple */
+    --category-video: #00b894; /* Green */
+    --category-emotion: #e17055; /* Orange-red */
+    --category-skills: #0984e3; /* Blue */
+    --category-casual: #fdcb6e; /* Yellow */
+    --category-default: #b2bec3; /* Gray */
   }
 
   * {

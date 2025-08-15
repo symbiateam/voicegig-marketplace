@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Navigation } from '@/components/navigation'
@@ -51,7 +50,6 @@ function LoginForm() {
       }
 
       if (data.user) {
-        toast.success('Signed in successfully!')
         router.push('/dashboard')
       }
     } catch (error) {
@@ -66,17 +64,15 @@ function LoginForm() {
       <Navigation />
 
       <div className="flex flex-1 items-center justify-center py-12 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <div className="flex items-center justify-center mb-4">
-            </div>
-            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
-            <CardDescription className="text-center">
+        <div className="w-full max-w-md space-y-6">
+          <div className="space-y-4 text-center">
+            <h1 className="text-2xl font-semibold">Welcome back</h1>
+            <p>
               Sign in to your Liva account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            </p>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -106,7 +102,7 @@ function LoginForm() {
                   Forgot password?
                 </Link>
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" variant="cta" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
               </Button>
@@ -117,8 +113,7 @@ function LoginForm() {
                 Sign up
               </Link>
             </div>
-          </CardContent>
-        </Card>
+          </div>
       </div>
     </div>
   )

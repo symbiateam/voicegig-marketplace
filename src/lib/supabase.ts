@@ -14,7 +14,7 @@ export type Database = {
           email: string
           full_name: string | null
           avatar_url: string | null
-          stripe_account_id: string | null
+          paypal_account_id: string | null
           created_at: string
           updated_at: string
         }
@@ -133,13 +133,36 @@ export type Database = {
           created_at?: string
         }
       }
+      balances: {
+        Row: {
+          user_id: string
+          available: number
+          pending_payout: number
+          total_earned: number
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          available: number
+          pending_payout?: number
+          total_earned: number
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          available?: number
+          pending_payout?: number
+          total_earned?: number
+          updated_at?: string
+        }
+      }
       payouts: {
         Row: {
           id: string
           user_id: string
           amount: number
           status: 'processing' | 'paid' | 'failed'
-          stripe_transfer_id: string | null
+          payout_id: string | null
           processed_at: string | null
           created_at: string
         }
@@ -164,14 +187,7 @@ export type Database = {
       }
     }
     Views: {
-      wallet_balances: {
-        Row: {
-          user_id: string
-          available: number
-          pending: number
-          total_earned: number
-        }
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never

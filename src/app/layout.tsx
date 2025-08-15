@@ -21,6 +21,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <script src="https://www.paypalobjects.com/js/external/api.js"></script>
+      </head>
       <body className={spaceGrotesk.className}>
         {children}
         <Toaster richColors position="top-right" />

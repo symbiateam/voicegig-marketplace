@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -17,7 +18,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Mail
 } from 'lucide-react'
 
 type WalletBalance = {
@@ -28,10 +30,21 @@ type WalletBalance = {
 
 type Payout = {
   id: string
+  user_id: string
   amount: number
-  status: 'processing' | 'paid' | 'failed'
+  status: string
   created_at: string
-  processed_at: string | null
+  payout_method?: string
+  payout_email?: string
+  payout_id?: string
+}
+
+
+
+type PayPalPayoutBody = {
+  amount: number
+  email: string
+  user_id: string
 }
 
 export default function EarningsPage() {
@@ -40,9 +53,7 @@ export default function EarningsPage() {
   const [payouts, setPayouts] = useState<Payout[]>([])
   const [loading, setLoading] = useState(true)
   const [payoutAmount, setPayoutAmount] = useState('')
-  const [requestingPayout, setRequestingPayout] = useState(false)
-  const [connectingStripe, setConnectingStripe] = useState(false)
-  const [stripeConnected, setStripeConnected] = useState(false)
+  const [paypalEmail, setPaypalEmail] = useState('')
 
   const fetchEarningsData = useCallback(async () => {
     try {
@@ -69,72 +80,28 @@ export default function EarningsPage() {
     }
   }, [user])
 
-  const checkStripeConnection = useCallback(async () => {
+  const checkPayPalConnection = useCallback(async () => {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('stripe_account_id')
+        .select('paypal_email')
         .eq('id', user?.id)
         .single()
 
-      setStripeConnected(!!profile?.stripe_account_id)
+      if (profile?.paypal_email) {
+        setPaypalEmail(profile.paypal_email)
+      }
     } catch (error) {
-      console.error('Error checking Stripe connection:', error)
+      console.error('Error checking PayPal connection:', error)
     }
   }, [user])
 
   useEffect(() => {
     if (user) {
       fetchEarningsData()
-      checkStripeConnection()
+      checkPayPalConnection()
     }
-  }, [user, fetchEarningsData, checkStripeConnection])
-
-  const connectStripe = async () => {
-    setConnectingStripe(true)
-
-    try {
-      // Call edge function to create Stripe Connect account
-      const { data: { session } } = await supabase.auth.getSession()
-
-      const response = await fetch('/api/stripe/connect-create-account', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create Stripe account')
-      }
-
-      // Get onboarding link
-      const onboardResponse = await fetch('/api/stripe/connect-onboard-link', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!onboardResponse.ok) {
-        throw new Error('Failed to get onboarding link')
-      }
-
-      const { url } = await onboardResponse.json()
-
-      // Redirect to Stripe onboarding
-      window.open(url, '_blank')
-
-      toast.success('Redirecting to Stripe setup...')
-    } catch (error) {
-      console.error('Error connecting Stripe:', error)
-      toast.error('Failed to connect Stripe account')
-    } finally {
-      setConnectingStripe(false)
-    }
-  }
+  }, [user, fetchEarningsData])
 
   const requestPayout = async () => {
     const amount = parseFloat(payoutAmount)
@@ -144,30 +111,39 @@ export default function EarningsPage() {
       return
     }
 
+    if (!paypalEmail) {
+      toast.error('Please enter your PayPal email')
+      return
+    }
+
     if (!balance || amount > balance.available) {
       toast.error('Insufficient available balance')
       return
     }
 
-    if (!stripeConnected) {
-      toast.error('Please connect your Stripe account first')
-      return
-    }
-
-    setRequestingPayout(true)
-
     try {
       const { data: { session } } = await supabase.auth.getSession()
 
-      const response = await fetch('/api/stripe/cashout', {
+      const endpoint = '/api/paypal/payout'
+      const body: PayPalPayoutBody = {
+        amount: amount,
+        email: paypalEmail,
+        user_id: user?.id || ''
+      }
+
+      // Save PayPal email to profile if it's new or changed
+      await supabase
+        .from('profiles')
+        .update({ paypal_email: paypalEmail })
+        .eq('id', user?.id)
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amount_dollars: amount
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -181,8 +157,6 @@ export default function EarningsPage() {
     } catch (error) {
       console.error('Error requesting payout:', error)
       toast.error('Failed to request payout')
-    } finally {
-      setRequestingPayout(false)
     }
   }
 
@@ -266,72 +240,63 @@ export default function EarningsPage() {
           <CardHeader>
             <CardTitle>Request Payout</CardTitle>
             <CardDescription>
-              Transfer your available balance to your bank account
+              Transfer your available balance to your PayPal account
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!stripeConnected ? (
-              <div className="text-center py-6">
-                <AlertCircle className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
-                <h3 className="text-lg font-medium mb-2">Connect Your Bank Account</h3>
-                <p className="text-muted-foreground mb-4">
-                  You need to connect your Stripe account to receive payouts.
-                </p>
-                <Button onClick={connectStripe} disabled={connectingStripe}>
-                  {connectingStripe ? (
-                    <>Connecting...</>
-                  ) : (
-                    <>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Connect Stripe Account
-                      <ExternalLink className="ml-2 h-3 w-3" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center text-green-600 mb-4">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  <span className="text-sm">Stripe account connected</span>
+            <div className="space-y-4 mb-4">
+              <div>
+                <div className="space-y-2 mb-4">
+                  <Label>Payout Method</Label>
+                  <div className="flex items-center space-x-2 p-2 border rounded-md">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    <span>PayPal</span>
+                  </div>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Payout Amount</Label>
+                  <Label htmlFor="paypal-email">PayPal Email</Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="amount"
-                      type="number"
-                      placeholder="0.00"
-                      value={payoutAmount}
-                      onChange={(e) => setPayoutAmount(e.target.value)}
+                      id="paypal-email"
+                      type="email"
+                      placeholder="your-email@example.com"
+                      value={paypalEmail}
+                      onChange={(e) => setPaypalEmail(e.target.value)}
                       className="pl-9"
-                      max={balance?.available || 0}
-                      step="0.01"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Available: ${balance?.available?.toFixed(2) || '0.00'}
-                  </p>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Payout Amount</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
+                    className="pl-9"
+                    max={balance?.available || 0}
+                    step="0.01"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Available: ${balance?.available?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+            </div>
 
-                <Button
-                  onClick={requestPayout}
-                  disabled={requestingPayout || !payoutAmount || parseFloat(payoutAmount) <= 0}
-                  className="w-full"
-                >
-                  {requestingPayout ? (
-                    'Processing...'
-                  ) : (
-                    <>
-                      <ArrowUpRight className="mr-2 h-4 w-4" />
-                      Request Payout
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
+            <Button
+              onClick={requestPayout}
+              disabled={!payoutAmount || parseFloat(payoutAmount) <= 0}
+              className="w-full"
+            >
+              <ArrowUpRight className="mr-2 h-4 w-4" />
+              Request Payout
+            </Button>
           </CardContent>
         </Card>
 
