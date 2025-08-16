@@ -300,46 +300,7 @@ export default function EarningsPage() {
           </CardContent>
         </Card>
 
-        {/* Payout History */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Payout History</CardTitle>
-            <CardDescription>
-              Track your payout requests and status
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {payouts.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No payouts yet.</p>
-                <p className="text-sm">Your payout history will appear here.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {payouts.map((payout) => (
-                  <div key={payout.id} className="flex items-center justify-between border rounded-lg p-4">
-                    <div>
-                      <div className="font-medium">${payout.amount.toFixed(2)}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(payout.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <Badge
-                      variant={
-                        payout.status === 'paid' ? 'default' :
-                        payout.status === 'processing' ? 'secondary' :
-                        'destructive'
-                      }
-                    >
-                      {payout.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Payout History section removed as requested */}
       </div>
     </div>
   )
