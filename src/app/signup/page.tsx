@@ -50,6 +50,17 @@ export default function SignUpPage() {
       return
     }
     
+    // Check for lowercase, uppercase, number, and special character
+    const hasLowercase = /[a-z]/.test(formData.password);
+    const hasUppercase = /[A-Z]/.test(formData.password);
+    const hasNumber = /[0-9]/.test(formData.password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(formData.password);
+    
+    if (!hasLowercase || !hasUppercase || !hasNumber || !hasSpecial) {
+      toast.error('Password should contain at least one character of each: lowercase letters, uppercase letters, numbers, and special characters')
+      return
+    }
+    
     // Check if all agreements are accepted
     if (!agreements.privacyPolicy || !agreements.termsOfUse || !agreements.eula || !agreements.acceptableUse) {
       toast.error('You must agree to all terms and policies to create an account')
@@ -171,6 +182,9 @@ export default function SignUpPage() {
                     onChange={handleInputChange}
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Password should contain at least one character of each: lowercase letters, uppercase letters, numbers, and special characters.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
