@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AuthProvider, useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { SidebarNavigation } from '@/components/sidebar-navigation'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,9 @@ import {
   User,
   LogOut
 } from 'lucide-react'
+
+// Debug logs for component rendering
+console.log('Rendering Dashboard Layout')
 
 function DashboardNav() {
   const { user, signOut } = useAuth()
@@ -107,6 +111,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
+  // Debug log for auth state
+  console.log('Auth state:', { user: !!user, loading })
+
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login')
@@ -126,9 +133,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <DashboardNav />
-      <main className="flex-1">
+    <div className="flex min-h-screen bg-[#f9f9f9]">
+      {/* Sidebar */}
+      <div className="relative min-h-screen w-[80px] bg-white">
+        <SidebarNavigation />
+      </div>
+      
+      {/* Main Content */}
+      <main className="flex-1 p-4">
         {children}
       </main>
     </div>

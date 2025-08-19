@@ -10,14 +10,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
-import { Mic2, Video, DollarSign, Search, Filter, ChevronRight, Briefcase } from 'lucide-react'
+import { Search, Filter, SlidersHorizontal } from 'lucide-react'
 
 type Job = {
   id: string
   title: string
   description: string
   type: 'audio' | 'video'
-  category?: string // Category field for Supabase
+  category?: string
   payment_amount: number
   requirements_text: string | null
   active: boolean
@@ -30,22 +30,40 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState<string>('newest')
+  
+  // Debug log
+  console.log('Rendering JobsPage component with Figma design')
 
   const fetchJobs = useCallback(async () => {
     try {
-      if (!user) { setLoading(false); return }
+      // Debug log
+      console.log('Fetching jobs data')
+      
+      if (!user) { 
+        console.log('No user found, skipping fetch')
+        setLoading(false)
+        return 
+      }
+      
       const { data, error } = await supabase
         .from('jobs')
         .select('*')
         .eq('active', true)
         .order('created_at', { ascending: false })
-      if (error) throw error
+        
+      if (error) {
+        console.error('Error fetching jobs:', error)
+        throw error
+      }
+      
+      console.log('Jobs data fetched:', data?.length || 0, 'jobs')
       
       // If jobs don't have a category yet, we'll need to add it to Supabase
       // This is temporary code to handle existing jobs without categories
       if (data && data.length > 0 && !data[0].category) {
+        console.log('Adding categories to jobs')
         // For demo purposes, assign random categories to jobs that don't have one
-        const categories = ['sad', 'skills', 'casual', 'audio', 'video'];
+        const categories = ['vacation', 'nails', 'food', 'skincare', 'skateboarding', 'furniture'];
         const updatedJobs = await Promise.all(data.map(async (job) => {
           // Assign a random category if none exists
           const randomCategory = categories[Math.floor(Math.random() * categories.length)];
@@ -67,7 +85,7 @@ export default function JobsPage() {
         setJobs(data ?? []);
       }
     } catch (e) {
-      console.error(e)
+      console.error('Error in fetchJobs:', e)
       setJobs([])
     } finally {
       setLoading(false)
@@ -75,6 +93,7 @@ export default function JobsPage() {
   }, [user])
 
   useEffect(() => {
+    console.log('Auth loading:', authLoading, 'User:', !!user)
     if (!authLoading && user) fetchJobs()
   }, [user, authLoading, fetchJobs])
 
@@ -96,74 +115,75 @@ export default function JobsPage() {
       if (sortBy === 'lowest-pay') return a.payment_amount - b.payment_amount
       return 0
     })
+    console.log('Filtered jobs:', filtered.length)
     return filtered
   }, [categorizedJobs, searchTerm, sortBy])
 
   return (
-    <div className="container py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight font-mono">Tasks</h1>
-        <p className="text-muted-foreground font-mono text-sm">Browse available tasks</p>
+    <div className="py-4 max-w-[1300px] mx-auto px-4">
+      <div className="mb-5">
+        <h1 className="text-[28px] font-bold mb-1 text-[#1a1a1a]">Ready to earn today?</h1>
+        <p className="text-[#6d6d6d] text-sm">Hot right now!! Grab these before they're gone</p>
       </div>
-
-      {/* compact controls */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 mb-8 items-end bg-[#f0f2f5] p-4 rounded-lg border border-[#e0e3e7]">
-        <div className="space-y-1">
-          <Label htmlFor="search" className="font-mono text-xs uppercase tracking-wider">Search</Label>
+      {/* Search and Filter Controls */}
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="flex-grow">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
             <Input
-              id="search"
-              placeholder="Search by title or description..."
+              type="text"
+              placeholder="Search for task..."
+              className="pl-9 h-10 border-[#e0e0e0] rounded-full text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 font-mono text-sm bg-white border-[#d0d3d7]"
             />
           </div>
         </div>
-        <div className="space-y-1">
-          <Label className="font-mono text-xs uppercase tracking-wider">Sort</Label>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-36 font-mono text-sm bg-white border-[#d0d3d7]">
-              <SelectValue placeholder="Sort" />
+        <div className="flex gap-3">
+          <Select
+            value={sortBy}
+            onValueChange={setSortBy}
+          >
+            <SelectTrigger className="w-[150px] h-10 border-[#e0e0e0] rounded-full text-sm">
+              <SelectValue placeholder="Sort by" />
             </SelectTrigger>
-            <SelectContent className="font-mono text-sm">
-              <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="highest-pay">Highest pay</SelectItem>
-              <SelectItem value="lowest-pay">Lowest pay</SelectItem>
+            <SelectContent>
+              <SelectItem value="newest">Newest First</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="highest">Highest Paying</SelectItem>
+              <SelectItem value="lowest">Lowest Paying</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex md:justify-end">
-          <Button variant="outline" className="w-full md:w-auto font-mono text-sm bg-white border-[#d0d3d7] hover:bg-[#f0f2f5]">
-            <Filter className="h-4 w-4 mr-2" /> Filters
+          <Button variant="outline" className="h-10 border-[#e0e0e0] rounded-full text-sm px-4">
+            <SlidersHorizontal size={16} className="mr-2" />
+            Filter
           </Button>
         </div>
       </div>
 
       {loading ? (
-        <div className="space-y-5 py-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 animate-pulse">
-              <div className="w-12 h-12 rounded-full bg-[var(--secondary-color)]/30" />
-              <div className="flex-1">
-                <div className="h-4 w-3/4 bg-[var(--secondary-color)]/20 rounded-full mb-2" />
-                <div className="h-3 w-1/2 bg-[var(--secondary-color)]/20 rounded-full" />
-              </div>
-              <div className="w-20 h-6 bg-[var(--secondary-color)]/20 rounded-full" />
-            </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <Card key={i} className="animate-pulse rounded-xl border border-[#d1d1d1] border-dashed h-[150px]">
+              <CardContent className="p-3">
+                <div className="w-8 h-8 rounded-full bg-gray-200 mb-2" />
+                <div className="h-4 w-3/4 bg-gray-200 rounded mb-1" />
+                <div className="h-3 w-1/2 bg-gray-200 rounded mb-4" />
+                <div className="h-5 w-14 bg-gray-200 rounded" />
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : filteredJobs.length === 0 ? (
-        <div className="py-10 text-center">
-          <Briefcase className="h-12 w-12 mx-auto mb-4 text-[var(--secondary-color)]" />
-          <div className="font-medium font-inter text-lg mb-2">No Tasks Found</div>
-          <div className="text-sm text-[var(--light-text)] font-inter">Try adjusting your search parameters</div>
+        <div className="py-12 text-center">
+          <div className="text-5xl mb-4">📝</div>
+          <div className="font-medium text-lg mb-2 text-[#1a1a1a]">No Tasks Found</div>
+          <div className="text-sm text-[#6d6d6d]">Try adjusting your search parameters</div>
         </div>
       ) : (
-        <div className="space-y-5 py-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {filteredJobs.map(job => (
-            <JobTile key={job.id} job={job} />
+            <JobCard key={job.id} job={job} />
           ))}
         </div>
       )}
@@ -173,57 +193,92 @@ export default function JobsPage() {
 
 
 
-function JobTile({ job }: { job: Job }) {
-  // Get the appropriate color based on job category
-  const getCategoryColor = (category?: string) => {
+function JobCard({ job }: { job: Job }) {
+  // Get the appropriate emoji based on job category
+  const getCategoryEmoji = (category?: string) => {
     switch (category) {
-      case 'audio': return 'var(--category-audio)';
-      case 'video': return 'var(--category-video)';
-      case 'emotion': return 'var(--category-emotion)';
-      case 'skills': return 'var(--category-skills)';
-      case 'casual': return 'var(--category-casual)';
-      default: return 'var(--category-default)';
+      case 'vacation':
+        return '🌴';
+      case 'nails':
+        return '💅';
+      case 'food':
+        return '🍝';
+      case 'skincare':
+        return '🧴';
+      case 'skateboarding':
+        return '🛹';
+      case 'furniture':
+        return '🪑';
+      case 'makeup':
+        return '💄';
+      case 'fitness':
+        return '🏋️‍♀️';
+      case 'tech':
+        return '💻';
+      default:
+        return job.type === 'audio' ? '🎙️' : '📹';
     }
   };
   
-  // Get the appropriate icon based on job type
-  const getCategoryIcon = (type: string) => {
-    if (type === 'audio') return <Mic2 className="w-4 h-4 text-white" />;
-    return <Video className="w-4 h-4 text-white" />;
+  // Format the job title to match the Figma design
+  const formatJobTitle = (title: string, category?: string) => {
+    // If title already starts with "Talk about" or "Video of", return as is
+    if (title.startsWith('Talk about') || title.startsWith('Video of') || title.startsWith('Show your')) {
+      return title;
+    }
+    
+    // Otherwise, format based on category and type
+    if (job.type === 'video') {
+      return `Video of you ${category || 'talking'}`;
+    } else {
+      return `Talk about your ${category || 'experience'}`;
+    }
   };
   
+  // Calculate time ago
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const createdAt = new Date(dateString);
+    const diffHours = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+    
+    if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else {
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) {
+        return `${diffDays}d ago`;
+      } else {
+        const diffWeeks = Math.floor(diffDays / 7);
+        return `${diffWeeks}w ago`;
+      }
+    }
+  };
+
+  // Debug log
+  console.log('Rendering JobCard:', job.id, job.title, job.category)
+  
   return (
-    <Link
-      href={`/dashboard/jobs/${job.id}`}
-      className="group flex items-center gap-4 py-3 hover:bg-[var(--card-accent)]/30 px-3 rounded-xl transition-all"
-    >
-      {/* Colored circle for category */}
-      <div 
-        className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: getCategoryColor(job.category) }}
-      >
-        {getCategoryIcon(job.type)}
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <h3 className="font-inter font-medium text-base text-[var(--text-color)]">{job.title}</h3>
-          <Badge variant="outline" className="border-[var(--secondary-color)] bg-[var(--secondary-color)]/10 text-[var(--secondary-color)] px-2 py-0 h-5 text-[10px] font-inter">
-            {job.category || job.type}
-          </Badge>
-        </div>
-        <p className="font-inter text-xs text-[var(--light-text)] line-clamp-1">{job.description}</p>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <div className="flex items-center text-lg font-inter font-medium text-[var(--primary-color)]">
-          <DollarSign className="w-5 h-5 mr-0.5" />
-          {new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(job.payment_amount)}
-        </div>
-        <div className="bg-[var(--secondary-color)]/10 p-2 rounded-full group-hover:bg-[var(--secondary-color)]/20 transition-colors">
-          <ChevronRight className="w-5 h-5 text-[var(--secondary-color)]" />
-        </div>
-      </div>
+    <Link href={`/dashboard/jobs/${job.id}`}>
+      <Card className="overflow-hidden hover:shadow-md transition-shadow rounded-xl border border-[#d1d1d1] border-dashed h-[150px]">
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-2xl">
+              {getCategoryEmoji(job.category)}
+            </div>
+          </div>
+          
+          <h3 className="font-semibold text-sm mb-1 line-clamp-2 text-[#1a1a1a]">
+            {formatJobTitle(job.title, job.category)}
+          </h3>
+          
+          <div className="flex items-center justify-between mt-3">
+            <div className="bg-[#00b286] flex items-center gap-1 px-2 py-0.5 rounded-lg text-white text-xs font-medium">
+              ${job.payment_amount}
+            </div>
+            <span className="text-[10px] text-[#6d6d6d]">{getTimeAgo(job.created_at)}</span>
+          </div>
+        </CardContent>
+      </Card>
     </Link>
   );
 }
