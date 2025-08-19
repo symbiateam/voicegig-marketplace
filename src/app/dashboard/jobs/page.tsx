@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { Search, Filter, SlidersHorizontal } from 'lucide-react'
+import { TaskDetailsModal } from '@/components/task-details-modal'
+import { TaskDetailsContent } from '@/components/task-details-content'
 
 type Job = {
   id: string
@@ -30,6 +31,26 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState<string>('newest')
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  // Debug log for modal state
+  console.log('Modal state:', { isModalOpen, selectedJobId: selectedJob?.id })
+  
+  // Open modal with selected job
+  const openJobModal = useCallback((job: Job) => {
+    console.log('Opening modal for job:', job.id)
+    setSelectedJob(job)
+    setIsModalOpen(true)
+  }, [])
+  
+  // Close modal
+  const closeJobModal = useCallback(() => {
+    console.log('Closing job modal')
+    setIsModalOpen(false)
+    // Keep the selected job for a moment to prevent UI flicker during close animation
+    setTimeout(() => setSelectedJob(null), 300)
+  }, [])
   
   // Debug log
   console.log('Rendering JobsPage component with Figma design')
@@ -183,9 +204,16 @@ export default function JobsPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {filteredJobs.map(job => (
-            <JobCard key={job.id} job={job} />
+            <JobCard key={job.id} job={job} onClick={() => openJobModal(job)} />
           ))}
         </div>
+      )}
+      
+      {/* Task Details Modal */}
+      {selectedJob && (
+        <TaskDetailsModal isOpen={isModalOpen} onClose={closeJobModal}>
+          <TaskDetailsContent jobId={selectedJob.id} onClose={closeJobModal} />
+        </TaskDetailsModal>
       )}
     </div>
   )
@@ -193,7 +221,7 @@ export default function JobsPage() {
 
 
 
-function JobCard({ job }: { job: Job }) {
+function JobCard({ job, onClick }: { job: Job, onClick: () => void }) {
   // Get the appropriate emoji based on job category
   const getCategoryEmoji = (category?: string) => {
     switch (category) {
@@ -258,8 +286,8 @@ function JobCard({ job }: { job: Job }) {
   console.log('Rendering JobCard:', job.id, job.title, job.category)
   
   return (
-    <Link href={`/dashboard/jobs/${job.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow rounded-xl border border-[#d1d1d1] border-dashed h-[150px]">
+    <div onClick={onClick}>
+      <Card className="overflow-hidden hover:shadow-md transition-shadow rounded-xl border border-[#d1d1d1] border-dashed h-[150px] cursor-pointer">
         <CardContent className="p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="text-2xl">
@@ -279,6 +307,6 @@ function JobCard({ job }: { job: Job }) {
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </div>
   );
 }
