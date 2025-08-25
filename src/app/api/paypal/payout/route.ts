@@ -50,14 +50,43 @@ export async function POST(request: Request) {
     const batchId = `PAYOUT_${uuidv4()}_${Date.now()}`
     const itemId = `ITEM_${uuidv4()}_${Date.now()}`
 
-    // Deduct from wallet balance
-    const { data: deductionResult, error: deductionError } = await supabaseAdmin.rpc(
-      'deduct_from_wallet',
-      { 
+    // Calculate balance directly from ledger table to bypass RLS on wallet_balances view
+    const { data: ledgerData, error: balanceError } = await supabaseAdmin
+      .from('ledger')
+      .select('amount, type')
+      .eq('user_id', user_id)
+
+    if (balanceError) {
+      console.error('Failed to get wallet balance:', balanceError)
+      return NextResponse.json(
+        { error: 'Failed to access wallet' },
+        { status: 500 }
+      )
+    }
+
+    // Calculate available balance from ledger entries
+    const credits = ledgerData?.filter(entry => entry.type === 'credit')
+      .reduce((sum, entry) => sum + parseFloat(entry.amount), 0) || 0
+    const debits = ledgerData?.filter(entry => entry.type === 'debit')
+      .reduce((sum, entry) => sum + parseFloat(entry.amount), 0) || 0
+    const availableBalance = credits - debits
+
+    // Check if sufficient funds
+    if (availableBalance < amount) {
+      return NextResponse.json(
+        { error: 'Insufficient funds' },
+        { status: 400 }
+      )
+    }
+
+    // Record debit transaction in ledger instead of updating balances table
+    const { error: deductionError } = await supabaseAdmin
+      .from('ledger')
+      .insert({
         user_id: user_id,
-        deduction_amount: amount
-      }
-    )
+        amount: amount,
+        type: 'debit'
+      })
 
     if (deductionError) {
       console.error('Failed to update wallet balance:', deductionError)
@@ -103,13 +132,18 @@ export async function POST(request: Request) {
     // Check if payout was successful
     if (!payoutResponse.ok) {
       console.error('PayPal payout error:', payoutData)
-      
-      // Refund the wallet if PayPal payout fails
-      await supabaseAdmin.rpc('add_to_wallet', {
-        user_id: user_id,
-        addition_amount: amount
-      })
-      
+      // If PayPal payout failed, refund by adding credit back to ledger
+      const { error: refundError } = await supabaseAdmin
+        .from('ledger')
+        .insert({
+          user_id: user_id,
+          amount: amount,
+          type: 'credit'
+        })
+
+      if (refundError) {
+        console.error('Failed to refund wallet after PayPal error:', refundError)
+      }
       return NextResponse.json(
         { error: payoutData.message || 'PayPal payout failed' },
         { status: payoutResponse.status }

@@ -1,86 +1,66 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
-import {
-  DollarSign,
-  Briefcase,
-  Upload,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  XCircle
-} from 'lucide-react'
 import Link from 'next/link'
+
+type Job = {
+  id: string
+  title: string
+  description: string
+  type: 'audio' | 'video'
+  category?: string
+  payment_amount: number
+  created_at: string
+}
 
 type DashboardStats = {
   totalEarnings: number
-  availableBalance: number
-  totalSubmissions: number
   approvedSubmissions: number
-  rejectedSubmissions: number
   pendingSubmissions: number
-  activeJobs: number
 }
 
 export default function DashboardPage() {
   const { user } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({
     totalEarnings: 0,
-    availableBalance: 0,
-    totalSubmissions: 0,
     approvedSubmissions: 0,
-    rejectedSubmissions: 0,
     pendingSubmissions: 0,
-    activeJobs: 0
   })
+  const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchDashboardStats = useCallback(async () => {
     try {
-      // Fetch wallet balance
-      const { data: walletData } = await supabase
-        .from('wallet_balances')
-        .select('available, total_earned')
+      if (!user?.id) return
+
+      const { data: balanceData } = await supabase
+        .from('balances')
+        .select('total_earned')
+        .eq('user_id', user.id)
         .single()
 
-      // Fetch submissions
       const { data: submissions } = await supabase
         .from('submissions')
         .select('status')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
 
-      // Fetch active jobs
-      const { data: jobs } = await supabase
+      const { data: jobsData } = await supabase
         .from('jobs')
-        .select('id')
-        .eq('status', 'open')
-
-      // Calculate stats
-      const totalEarnings = walletData?.total_earned || 0
-      const availableBalance = walletData?.available || 0
-
-      const totalSubmissions = submissions?.length || 0
-      const approvedSubmissions = submissions?.filter(s => s.status === 'approved').length || 0
-      const rejectedSubmissions = submissions?.filter(s => s.status === 'rejected').length || 0
-      const pendingSubmissions = submissions?.filter(s => s.status === 'submitted').length || 0
-
-      const activeJobs = jobs?.length || 0
+        .select('id, title, description, type, category, payment_amount, created_at')
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(6)
 
       setStats({
-        totalEarnings,
-        availableBalance,
-        totalSubmissions,
-        approvedSubmissions,
-        rejectedSubmissions,
-        pendingSubmissions,
-        activeJobs
+        totalEarnings: balanceData?.total_earned || 0,
+        approvedSubmissions: submissions?.filter(s => s.status === 'approved').length || 0,
+        pendingSubmissions: submissions?.filter(s => s.status === 'submitted').length || 0,
       })
+
+      setJobs(jobsData || [])
     } catch (error) {
       console.error('Error fetching dashboard stats:', error)
     } finally {
@@ -89,193 +69,107 @@ export default function DashboardPage() {
   }, [user])
 
   useEffect(() => {
-    if (user) {
-      fetchDashboardStats()
-    }
+    if (user) fetchDashboardStats()
   }, [user, fetchDashboardStats])
 
-  const completionRate = stats.totalSubmissions > 0
-    ? Math.round((stats.approvedSubmissions / stats.totalSubmissions) * 100)
-    : 0
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date()
+    const createdAt = new Date(dateString)
+    const diffHours = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60))
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays < 7) return `${diffDays}d ago`
+    return `${Math.floor(diffDays / 7)}w ago`
+  }
 
   if (loading) {
     return (
-      <div className="container py-8">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 w-16 bg-muted animate-pulse rounded"></div>
-                <div className="h-4 w-4 bg-muted animate-pulse rounded"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-20 bg-muted animate-pulse rounded mb-2"></div>
-                <div className="h-3 w-32 bg-muted animate-pulse rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="py-8 max-w-[900px] mx-auto px-4 grid gap-4 md:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-[140px] bg-gray-100 rounded-2xl animate-pulse" />
+        ))}
       </div>
     )
   }
 
   return (
-    <div className="container py-8">
-      {/* Welcome Section */}
+    <div className="py-6 max-w-[1000px] mx-auto px-4">
+      {/* Welcome */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome back {user?.user_metadata?.full_name }!
+        <h1 className="text-[26px] font-bold text-[#1a1a1a]">
+          Welcome back, {user?.user_metadata?.full_name || 'User'}
         </h1>
-        <p className="text-muted-foreground">
-          Here's your earnings and activity overview.
-        </p>
+        <p className="text-sm text-[#6d6d6d]">Here's your progress</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${stats.totalEarnings.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              All-time earnings
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${stats.availableBalance.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Ready for payout
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
-            <Upload className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
-            <p className="text-xs text-muted-foreground">
-              Work submitted
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeJobs}</div>
-            <p className="text-xs text-muted-foreground">
-              Available opportunities
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Performance Overview */}
-      <div className="grid gap-4 md:grid-cols-2 mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Overview</CardTitle>
-            <CardDescription>Your submission completion rate</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Completion Rate</span>
-                <span className="font-medium">{completionRate}%</span>
-              </div>
-              <Progress value={completionRate} className="h-2" />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 pt-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-1 mb-1">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="text-sm font-medium">{stats.approvedSubmissions}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Approved</p>
-              </div>
-
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-1 mb-1">
-                  <Clock className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm font-medium">{stats.pendingSubmissions}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Pending</p>
-              </div>
-
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-1 mb-1">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  <span className="text-sm font-medium">{stats.rejectedSubmissions}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Rejected</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Get started with your next task</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button asChild className="w-full">
-              <Link href="/dashboard/jobs">
-                <Briefcase className="mr-2 h-4 w-4" />
-                Browse Available Jobs
-              </Link>
-            </Button>
-
-            <Button variant="outline" asChild className="w-full">
-              <Link href="/dashboard/submissions">
-                <Upload className="mr-2 h-4 w-4" />
-                View My Submissions
-              </Link>
-            </Button>
-
-            {stats.availableBalance > 0 && (
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/dashboard/earnings">
-                  <DollarSign className="mr-2 h-4 w-4" />
-                  Request Payout
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Your latest submissions and earnings</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No recent activity yet.</p>
-            <p className="text-sm">Start by browsing available jobs!</p>
+      {/* Stat Tiles */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+        {/* Earnings */}
+        <div className="bg-[#FF6E35] text-white rounded-3xl p-4 flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm opacity-90">Earnings so far</h3>
+            <p className="text-3xl font-bold mt-1">${stats.totalEarnings.toFixed(2)}</p>
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            asChild
+            className="mt-3 bg-white text-[#FF6E35] hover:bg-gray-100 rounded-full text-sm font-medium"
+          >
+            <Link href="/dashboard/earnings">Withdraw</Link>
+          </Button>
+        </div>
+
+        {/* Pending Review */}
+        <div className="bg-[#E661FF] text-white rounded-3xl p-4 flex flex-col justify-center">
+          <h3 className="text-sm opacity-90">Pending Review</h3>
+          <p className="text-3xl font-bold mt-1">{stats.pendingSubmissions}</p>
+          <p className="text-xs opacity-80 mt-1">submissions</p>
+        </div>
+
+        {/* Accepted */}
+        <div className="bg-[#00BDA6] text-white rounded-3xl p-4 flex flex-col justify-center">
+          <h3 className="text-sm opacity-90">Accepted</h3>
+          <p className="text-3xl font-bold mt-1">{stats.approvedSubmissions}</p>
+          <p className="text-xs opacity-80 mt-1">submissions</p>
+        </div>
+      </div>
+
+      {/* Featured Tasks */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-[#1a1a1a]">Featured Tasks</h2>
+          <Button asChild variant="link" className="text-[#FF6E35] p-0 h-auto">
+            <Link href="/dashboard/jobs">View all</Link>
+          </Button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200">
+          {jobs.map((job, idx) => (
+            <Link key={job.id} href={`/dashboard/jobs`}>
+              <div
+                className={`px-5 py-4 hover:bg-gray-50 transition ${
+                  idx !== jobs.length - 1 ? 'border-b border-gray-100' : ''
+                }`}
+              >
+                {/* Top row */}
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-medium text-[#1a1a1a] line-clamp-1">
+                    {job.title}
+                  </h3>
+                  <span className="text-xs font-semibold bg-[#FF6E35] text-white px-2 py-0.5 rounded-full">
+                    ${job.payment_amount}
+                  </span>
+                </div>
+
+                {/* Bottom row */}
+                <div className="flex items-center justify-between text-xs text-[#6d6d6d]">
+                  <span className="capitalize">{job.type}</span>
+                  <span>{getTimeAgo(job.created_at)}</span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

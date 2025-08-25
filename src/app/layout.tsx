@@ -1,10 +1,10 @@
 import React from 'react'
 import type { Metadata } from 'next'
-import { Space_Grotesk } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
 
-const spaceGrotesk = Space_Grotesk({ 
+const inter = Inter({ 
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700']
 })
@@ -24,7 +24,7 @@ export default function RootLayout({
       <head>
         <script src="https://www.paypalobjects.com/js/external/api.js"></script>
       </head>
-      <body className={spaceGrotesk.className}>
+      <body className={inter.className}>
         {children}
         <Toaster richColors position="top-right" />
       </body>
