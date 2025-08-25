@@ -1,24 +1,23 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import {
-  Upload,
-  Mic2,
-  Video,
-  DollarSign,
-  Clock,
+  Search,
+  Filter,
   CheckCircle,
+  Clock,
+  Mic2,
   XCircle,
-  Eye,
-  FileAudio,
-  FileVideo,
-  ExternalLink
+  Upload,
+  Video,
+  DollarSign
 } from 'lucide-react'
 
 type Submission = {
@@ -37,23 +36,39 @@ type Submission = {
   } | null
 }
 
+const STATUS_META: Record<Submission['status'], { label: string; tint: string; pill: string; icon: JSX.Element }> = {
+  approved: {
+    label: 'Accepted',
+    tint: 'text-[var(--category-video)]',
+    pill: 'bg-[var(--category-video)]/10 text-[var(--category-video)]',
+    icon: <CheckCircle className="h-4 w-4" />,
+  },
+  submitted: {
+    label: 'Pending Review',
+    tint: 'text-[var(--category-casual)]',
+    pill: 'bg-[var(--category-casual)]/20 text-[var(--category-casual)]',
+    icon: <Clock className="h-4 w-4" />,
+  },
+  rejected: {
+    label: 'Rejected',
+    tint: 'text-[var(--category-emotion)]',
+    pill: 'bg-[var(--category-emotion)]/10 text-[var(--category-emotion)]',
+    icon: <XCircle className="h-4 w-4" />,
+  },
+}
+
 export default function SubmissionsPage() {
   const { user } = useAuth()
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [tab, setTab] = useState<'all' | Submission['status']>('all')
 
   const fetchSubmissions = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('submissions')
-        .select(`
-          *,
-          jobs (
-            title,
-            type,
-            payment_amount
-          )
-        `)
+        .select(`*, jobs ( title, type, payment_amount )`)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
 
@@ -67,220 +82,107 @@ export default function SubmissionsPage() {
   }, [user])
 
   useEffect(() => {
-    if (user) {
-      fetchSubmissions()
-    }
+    if (user) fetchSubmissions()
   }, [user, fetchSubmissions])
 
-  const displaySubmissions = submissions
+  const counts = useMemo(() => ({
+    approved: submissions.filter(s => s.status === 'approved').length,
+    submitted: submissions.filter(s => s.status === 'submitted').length,
+    rejected: submissions.filter(s => s.status === 'rejected').length,
+  }), [submissions])
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case 'rejected':
-        return <XCircle className="h-4 w-4 text-red-500" />
-      case 'submitted':
-        return <Clock className="h-4 w-4 text-yellow-500" />
-      default:
-        return <Clock className="h-4 w-4 text-gray-500" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'default'
-      case 'rejected':
-        return 'destructive'
-      case 'submitted':
-        return 'secondary'
-      default:
-        return 'outline'
-    }
-  }
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return submissions.filter(s => {
+      const matchesTab = tab === 'all' ? true : s.status === tab
+      const title = s.jobs?.title?.toLowerCase() || ''
+      const statusTxt = s.status.toLowerCase()
+      const typeTxt = s.jobs?.type || ''
+      const matchesSearch = !q || title.includes(q) || statusTxt.includes(q) || typeTxt.includes(q)
+      return matchesTab && matchesSearch
+    })
+  }, [submissions, searchQuery, tab])
 
   if (loading) {
     return (
-      <div className="container py-8">
-        <div className="h-8 w-48 bg-muted animate-pulse rounded mb-8"></div>
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <div className="h-5 w-3/4 bg-muted animate-pulse rounded mb-2"></div>
-                <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-4 w-full bg-muted animate-pulse rounded mb-2"></div>
-                <div className="h-4 w-2/3 bg-muted animate-pulse rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="py-4 max-w-[900px] mx-auto px-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg mb-3" />
+        ))}
       </div>
     )
   }
 
   return (
-    <div className="container py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">My Submissions</h1>
-        <p className="text-muted-foreground">
-          Track the status of your submitted work and feedback from clients.
-        </p>
+    <div className="py-4 max-w-[900px] mx-auto px-4">
+      <div className="mb-5 text-center">
+        <h1 className="text-[28px] font-bold mb-1 text-[#1a1a1a]">Your submissions</h1>
+        <p className="text-[#6d6d6d] text-sm">Hot right now!! Grab these before they're gone</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
-            <Upload className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{displaySubmissions.length}</div>
-          </CardContent>
-        </Card>
+      {/* Tabs styled with category colors */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="mb-6">
+        <TabsList className="flex gap-2 w-full justify-center bg-[var(--light-background)] p-1 rounded-full">
+          <TabsTrigger value="all" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-default)] data-[state=active]:text-white text-[var(--light-text)]">
+            All ({submissions.length})
+          </TabsTrigger>
+          <TabsTrigger value="approved" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-video)] data-[state=active]:text-white text-[var(--light-text)]">
+            Accepted ({counts.approved})
+          </TabsTrigger>
+          <TabsTrigger value="submitted" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-casual)] data-[state=active]:text-white text-[var(--light-text)]">
+            Pending ({counts.submitted})
+          </TabsTrigger>
+          <TabsTrigger value="rejected" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-emotion)] data-[state=active]:text-white text-[var(--light-text)]">
+            Rejected ({counts.rejected})
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {displaySubmissions.filter(s => s.status === 'approved').length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {displaySubmissions.filter(s => s.status === 'submitted').length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {displaySubmissions.length > 0
-                ? Math.round((displaySubmissions.filter(s => s.status === 'approved').length / displaySubmissions.length) * 100)
-                : 0}%
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Submissions List */}
-      {displaySubmissions.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No submissions yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Start by browsing available jobs and submitting your work.
-            </p>
-            <Button asChild>
-              <Link href="/dashboard/jobs">Browse Jobs</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      {filtered.length === 0 ? (
+        <div className="py-12 text-center">
+          <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-medium text-[#1a1a1a] mb-1">No submissions yet</h3>
+          <p className="text-sm text-[#6d6d6d] mb-4">Start by browsing available jobs and submitting your work.</p>
+          <Button asChild className="rounded-full bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] text-white">
+            <Link href="/dashboard/jobs">Browse Jobs</Link>
+          </Button>
+        </div>
       ) : (
-        <div className="space-y-4">
-          {displaySubmissions.map((submission) => (
-            <Card key={submission.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg mb-2">
-                      {submission.jobs?.title || 'Unknown Job'}
-                    </CardTitle>
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <Badge variant={submission.jobs?.type === 'audio' ? 'default' : 'secondary'}>
-                        {submission.jobs?.type === 'audio' ? (
-                          <Mic2 className="w-3 h-3 mr-1" />
-                        ) : (
-                          <Video className="w-3 h-3 mr-1" />
-                        )}
-                        {submission.jobs?.type}
-                      </Badge>
-                      <div className="flex items-center">
-                        <DollarSign className="w-4 h-4 mr-1" />
-                        ${submission.jobs?.payment_amount}
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {new Date(submission.created_at).toLocaleDateString()}
-                      </div>
+        <div className="space-y-3">
+          {filtered.map((s) => {
+            const meta = STATUS_META[s.status]
+            return (
+              <div
+                key={s.id}
+                className="flex items-center justify-between bg-white border border-[var(--border-color)] rounded-lg px-4 py-3 hover:bg-[var(--card-hover)] transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-xl">
+                    {s.jobs?.type === 'audio' ? <Mic2 className="h-5 w-5 text-[var(--category-audio)]" /> : <Video className="h-5 w-5 text-[var(--category-video)]" />}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm text-[#1a1a1a]">{s.jobs?.title || 'Untitled job'}</h3>
+                    <div className="text-xs text-[var(--light-text)] flex gap-2">
+                      <span>${s.jobs?.payment_amount ?? '-'}</span>
+                      <span>•</span>
+                      <span>1 min</span>
+                      <span>•</span>
+                      <span className="capitalize">{s.jobs?.type}</span>
                     </div>
                   </div>
-                  <Badge variant={getStatusColor(submission.status)}>
-                    {getStatusIcon(submission.status)}
-                    {submission.status}
-                  </Badge>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* File Info */}
-                <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg">
-                  {submission.file_type.startsWith('audio/') ? (
-                    <FileAudio className="h-5 w-5 text-primary" />
-                  ) : (
-                    <FileVideo className="h-5 w-5 text-primary" />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-medium">Submitted File</p>
-                    <p className="text-sm text-muted-foreground">
-                      {submission.file_type}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={submission.file_url} target="_blank" rel="noopener noreferrer">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
-                      <ExternalLink className="w-3 h-3 ml-1" />
-                    </a>
-                  </Button>
+                <div className="flex items-center gap-3">
+                  <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${meta.pill}`}>
+                    {meta.icon}
+                    {meta.label}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
                 </div>
-
-                {/* Notes/Feedback */}
-                {submission.notes && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="font-medium mb-1">
-                      {submission.status === 'approved' ? 'Feedback' : 'Review Notes'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{submission.notes}</p>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-2">
-                  <div className="text-xs text-muted-foreground">
-                    Last updated: {new Date(submission.updated_at).toLocaleString()}
-                  </div>
-                  {submission.status === 'rejected' && (
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/jobs/${submission.job_id}`}>
-                        Resubmit Work
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

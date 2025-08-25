@@ -34,7 +34,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
   const { user } = useAuth()
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'details' | 'options' | 'upload' | 'record'>('details')
+  const [view, setView] = useState<'details' | 'options' | 'upload' | 'record' | 'success'>('details')
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [notes, setNotes] = useState('')
@@ -200,12 +200,8 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
 
       console.log("✅ Submission created:", submissionData);
 
-      toast.success('Your work has been submitted successfully!')
-      
-      // Close modal after successful submission
-      setTimeout(() => {
-        onClose()
-      }, 1500)
+      // Show success view instead of closing modal
+      setView('success')
       
     } catch (error) {
       console.error('Error submitting work:', error)
@@ -343,14 +339,10 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
         throw submissionError
       }
       
-      console.log("✅ Submission created:", submissionData)
+      console.log("✅ Submission created:", submissionData);
       
-      toast.success('Your recording has been submitted successfully!')
-      
-      // Close modal after successful submission
-      setTimeout(() => {
-        onClose()
-      }, 1500)
+      // Show success view instead of closing modal
+      setView('success')
       
     } catch (error) {
       console.error('Error submitting recording:', error)
@@ -735,6 +727,33 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
                 Submit Recording
               </>
             )}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+  
+  // Success View
+  if (view === 'success') {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="flex flex-col items-center justify-center py-12">
+          {/* Success Icon */}
+          <div className="text-6xl mb-6">✅</div>
+          
+          {/* Success Message */}
+          <h2 className="text-2xl font-bold text-center mb-4">Submission sent!</h2>
+          <p className="text-center text-gray-600 mb-8 max-w-md">
+            We'll review in 24 hrs. Keep an eye on your dashboard for updates.
+          </p>
+          
+          {/* Go Home Button */}
+          <Button
+            onClick={onClose}
+            className="bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 px-8 rounded-full"
+            size="lg"
+          >
+            Go Home
           </Button>
         </div>
       </div>

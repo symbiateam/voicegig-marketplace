@@ -50,10 +50,10 @@ export function SidebarNavigation() {
             </div>
           </Link>
           
-          {/* Videos */}
-          <Link href="/dashboard/videos" className="block w-full px-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full">
-              <Video className="w-5 h-5 text-gray-700" />
+          {/* Submissions */}
+          <Link href="/dashboard/submissions" className="block w-full px-4">
+            <div className={`flex items-center justify-center w-12 h-12 rounded-full ${isActive('/dashboard/submissions') ? 'bg-[#f96f2f] shadow-sm ring-2 ring-[#ffbd9e] ring-opacity-50' : ''}`}>
+              <Video className={`w-5 h-5 ${isActive('/dashboard/submissions') ? 'text-white' : 'text-gray-700'}`} />
             </div>
           </Link>
           
