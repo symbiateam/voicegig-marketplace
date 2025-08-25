@@ -184,10 +184,11 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           {
             job_id: job.id,
             user_id: user.id,
+            file_path: fileName,
             file_url: fileUrl,
             file_type: job.type,
             notes: notes,
-            status: 'pending'
+            status: 'submitted'
           }
         ])
         .select()
@@ -328,10 +329,11 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           {
             job_id: job.id,
             user_id: user.id,
+            file_path: fileName,
             file_url: fileUrl,
             file_type: 'audio',
             notes: notes,
-            status: 'pending'
+            status: 'submitted'
           }
         ])
         .select()
