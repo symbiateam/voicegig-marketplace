@@ -248,19 +248,9 @@ function JobCard({ job, onClick }: { job: Job, onClick: () => void }) {
     }
   };
   
-  // Format the job title to match the Figma design
+  // Use the actual job title from database
   const formatJobTitle = (title: string, category?: string) => {
-    // If title already starts with "Talk about" or "Video of", return as is
-    if (title.startsWith('Talk about') || title.startsWith('Video of') || title.startsWith('Show your')) {
-      return title;
-    }
-    
-    // Otherwise, format based on category and type
-    if (job.type === 'video') {
-      return `Video of you ${category || 'talking'}`;
-    } else {
-      return `Talk about your ${category || 'experience'}`;
-    }
+    return title.trim();
   };
   
   // Calculate time ago
