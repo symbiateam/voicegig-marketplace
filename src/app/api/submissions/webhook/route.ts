@@ -165,23 +165,63 @@ export async function POST(request: Request) {
       submissionId
     })
 
-    // Update notification log with success
-    await supabaseAdmin
-      .from('notification_log')
-      .update({ 
-        sent_at: new Date().toISOString(),
-        error_message: null
+    // Send actual email using Resend
+    try {
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'VoiceGig <noreply@theliva.ai>',
+          to: [userEmail],
+          subject,
+          html,
+        }),
       })
-      .eq('submission_id', submissionId)
-      .eq('status', status)
 
-    // TODO: Replace with actual email service (SendGrid, Resend, etc.)
-    // For now, we're just logging the email content
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Email notification sent successfully'
-    })
+      if (!emailResponse.ok) {
+        const errorData = await emailResponse.text()
+        throw new Error(`Resend API error: ${emailResponse.status} - ${errorData}`)
+      }
+
+      const emailResult = await emailResponse.json()
+      console.log('✅ Email sent successfully:', emailResult)
+
+      // Update notification log with success
+      await supabaseAdmin
+        .from('notification_log')
+        .update({ 
+          sent_at: new Date().toISOString(),
+          error_message: null
+        })
+        .eq('submission_id', submissionId)
+        .eq('status', status)
+
+      return NextResponse.json({
+        success: true,
+        message: 'Email notification sent successfully',
+        emailId: emailResult.id
+      })
+
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError)
+      
+      // Update notification log with error
+      await supabaseAdmin
+        .from('notification_log')
+        .update({ 
+          error_message: emailError instanceof Error ? emailError.message : 'Email sending failed'
+        })
+        .eq('submission_id', submissionId)
+        .eq('status', status)
+
+      return NextResponse.json(
+        { error: 'Failed to send email', details: emailError instanceof Error ? emailError.message : 'Unknown error' },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error('Webhook email error:', error)
     
