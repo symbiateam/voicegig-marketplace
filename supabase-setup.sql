@@ -162,6 +162,43 @@ CREATE TRIGGER update_submissions_updated_at
     BEFORE UPDATE ON public.submissions
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+-- Function to deduct from wallet balance
+CREATE OR REPLACE FUNCTION public.deduct_from_wallet(user_id UUID, deduction_amount DECIMAL)
+RETURNS BOOLEAN AS $$
+DECLARE
+    current_balance DECIMAL;
+BEGIN
+    -- Get current available balance
+    SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0)
+    INTO current_balance
+    FROM ledger
+    WHERE ledger.user_id = deduct_from_wallet.user_id;
+    
+    -- Check if sufficient funds
+    IF current_balance < deduction_amount THEN
+        RAISE EXCEPTION 'Insufficient funds or wallet not found';
+    END IF;
+    
+    -- Insert debit transaction
+    INSERT INTO ledger (user_id, amount, type)
+    VALUES (deduct_from_wallet.user_id, deduction_amount, 'debit');
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add to wallet balance
+CREATE OR REPLACE FUNCTION public.add_to_wallet(user_id UUID, addition_amount DECIMAL)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Insert credit transaction
+    INSERT INTO ledger (user_id, amount, type)
+    VALUES (add_to_wallet.user_id, addition_amount, 'credit');
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Insert some sample jobs
 INSERT INTO public.jobs (title, description, type, payment_amount, requirements) VALUES
 ('Professional Podcast Intro', 'We need a warm, professional voice for our business podcast intro. Should be engaging and authoritative. Script is 30 seconds long.', 'audio', 75.00, 'Professional quality audio, quiet background, clear pronunciation'),

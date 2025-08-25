@@ -8,7 +8,6 @@ import {
   FileText, 
   Video, 
   Wallet, 
-  Settings,
   User
 } from 'lucide-react'
 
@@ -74,12 +73,6 @@ export function SidebarNavigation() {
           </div>
         </Link>
         
-        {/* Settings */}
-        <Link href="/dashboard/settings" className="block w-full px-4 mb-5">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full">
-            <Settings className="w-5 h-5 text-gray-700" />
-          </div>
-        </Link>
       </div>
     </div>
   )

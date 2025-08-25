@@ -1,253 +1,197 @@
 'use client'
 
-import React from 'react'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import Script from 'next/script'
-import {
-  User,
-  Mail,
-  CreditCard,
-  ExternalLink,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  DollarSign,
-  Settings
-} from 'lucide-react'
-
+import { User, Mail, CreditCard, CheckCircle, AlertCircle, DollarSign, Settings, Loader2 } from 'lucide-react'
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [paypalAccount, setPaypalAccount] = useState<{email: string, verified: boolean} | null>(null)
+  const [paypalAccount, setPaypalAccount] = useState<{ email: string; verified: boolean } | null>(null)
   const [profileData, setProfileData] = useState({
     full_name: user?.user_metadata?.full_name || '',
     email: user?.email || '',
   })
 
-  console.log("👤 Profile page loaded", { user: user?.id, email: user?.email });
-
-  // Fetch user's payment accounts status
-  const fetchAccountStatus = async () => {
+  const fetchAccountStatus = useCallback(async () => {
     if (!user) return
-
     try {
-      console.log("🔍 Fetching account status...");
-
-      const { data: profiles, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('paypal_email, paypal_verified')
         .eq('id', user.id)
         .single()
 
-      console.log("📊 User profile query result:", { profiles, error });
-
-      if (error) {
-        console.error("Error fetching profile:", error)
-        return
-      }
-
-      // Handle PayPal account
-      if (profiles?.paypal_email) {
-        setPaypalAccount({
-          email: profiles.paypal_email,
-          verified: profiles.paypal_verified || false
-        })
+      if (data?.paypal_email) {
+        setPaypalAccount({ email: data.paypal_email, verified: !!data.paypal_verified })
       } else {
-        setPaypalAccount(null);
+        setPaypalAccount(null)
       }
-    } catch (error) {
-      console.error('Error fetching PayPal account:', error)
-    }
-  }
-
-  useEffect(() => {
-    if (user) {
-      fetchAccountStatus()
+    } catch (e) {
+      console.error(e)
     }
   }, [user])
 
-  const handleProfileUpdate = async (e: React.FormEvent) => {
+  useEffect(() => { if (user) fetchAccountStatus() }, [user, fetchAccountStatus])
+
+  const handleProfileUpdate = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
-
     try {
-      console.log("💾 Updating user profile...", profileData);
+      const { error } = await supabase.auth.updateUser({ data: { full_name: profileData.full_name } })
+      if (error) throw error
 
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          full_name: profileData.full_name
-        }
+      await supabase.from('profiles').upsert({
+        id: user?.id,
+        full_name: profileData.full_name,
+        email: profileData.email,
+        updated_at: new Date().toISOString(),
       })
 
-      if (error) {
-        console.error("❌ Profile update error:", error);
-        throw error;
-      }
-
-      // Also update the profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user?.id,
-          full_name: profileData.full_name,
-          email: profileData.email,
-          updated_at: new Date().toISOString()
-        })
-
-      if (profileError) {
-        console.error("❌ Profile table update error:", profileError);
-        // Don't throw here, as the auth update succeeded
-      }
-
-      console.log("✅ Profile updated successfully");
-      toast.success('Profile updated successfully!')
-
-      if (updateProfile) {
-        updateProfile({ full_name: profileData.full_name })
-      }
-    } catch (error: any) {
-      console.error('Error updating profile:', error)
-      toast.error(error.message || 'Failed to update profile')
+      updateProfile?.({ full_name: profileData.full_name })
+      toast.success('Profile updated!')
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update profile')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="py-6 max-w-[1000px] mx-auto px-4">
+    <div className="py-6 max-w-[900px] mx-auto px-4">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-[26px] font-bold text-[#1a1a1a]">Profile Settings</h1>
-        <p className="text-sm text-[#6d6d6d]">Manage your account settings and payment preferences</p>
+      <div className="mb-6">
+        <h1 className="text-[26px] font-bold text-[#1a1a1a]">Profile</h1>
+        <p className="text-sm text-[#6d6d6d]">Manage your info & payouts</p>
       </div>
 
-      <div className="space-y-6">
-        {/* Profile Information */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      {/* Single flat container with only dividers */}
+      <div className="bg-white border border-gray-200 rounded-2xl">
+        {/* Personal information */}
+        <section className="px-5 py-5 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-4">
-            <User className="w-5 h-5 text-[#FF6E35]" />
-            <h2 className="text-lg font-semibold text-[#1a1a1a]">Personal Information</h2>
+            <User className="h-5 w-5 text-[#FF6E35]" />
+            <h2 className="text-sm font-semibold text-[#1a1a1a]">Personal information</h2>
           </div>
-          <p className="text-sm text-[#6d6d6d] mb-6">Update your personal details and contact information</p>
-          
-          <form onSubmit={handleProfileUpdate} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="full_name" className="text-sm font-medium text-[#1a1a1a]">Your Name</Label>
-                <Input
-                  id="full_name"
-                  value={profileData.full_name}
-                  onChange={(e) => setProfileData(prev => ({
-                    ...prev,
-                    full_name: e.target.value
-                  }))}
-                  placeholder="Enter your full name"
-                  className="rounded-full border-gray-200"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-[#1a1a1a]">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={profileData.email}
-                  disabled
-                  className="rounded-full border-gray-200 bg-gray-50"
-                />
-                <p className="text-xs text-[#6d6d6d]">
-                  Email cannot be changed here. Contact support if needed.
-                </p>
-              </div>
+
+          <form onSubmit={handleProfileUpdate} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Input
+                placeholder="Your name"
+                value={profileData.full_name}
+                onChange={(e) => setProfileData(p => ({ ...p, full_name: e.target.value }))}
+                className="h-10 rounded-full"
+              />
+              <Input
+                type="email"
+                value={profileData.email}
+                disabled
+                className="h-10 rounded-full bg-gray-50"
+              />
             </div>
-            <Button type="submit" disabled={loading} className="rounded-full bg-[#FF6E35] hover:bg-[#e55a2b] text-white">
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="h-10 rounded-full bg-[#FF6E35] hover:bg-[#e55a2b] text-white"
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update Profile
+              Save changes
             </Button>
           </form>
-        </div>
+        </section>
 
-        {/* Payment Methods */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CreditCard className="w-5 h-5 text-[#FF6E35]" />
-            <h2 className="text-lg font-semibold text-[#1a1a1a]">Payment Methods</h2>
+        {/* Payment method */}
+        <section className="px-5 py-5 border-b border-gray-200">
+          <div className="flex items-center gap-2 mb-3">
+            <CreditCard className="h-5 w-5 text-[#FF6E35]" />
+            <h2 className="text-sm font-semibold text-[#1a1a1a]">Payment method</h2>
           </div>
-          <p className="text-sm text-[#6d6d6d] mb-6">Connect your PayPal account to receive earnings</p>
-          
-          <div className="space-y-4">
-            {paypalAccount ? (
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-2xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[#1a1a1a]">PayPal Account</p>
-                    <p className="text-xs text-[#6d6d6d]">{paypalAccount.email}</p>
-                  </div>
+
+          {paypalAccount ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#E6F8F4] flex items-center justify-center">
+                  <DollarSign className="h-5 w-5 text-[#00BDA6]" />
                 </div>
-                <Badge variant={paypalAccount.verified ? "default" : "secondary"} className="rounded-full">
-                  {paypalAccount.verified ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Verified
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-3 h-3 mr-1" />
-                      Pending
-                    </>
-                  )}
-                </Badge>
+                <div>
+                  <p className="text-sm font-medium text-[#1a1a1a]">PayPal</p>
+                  <p className="text-xs text-[#6d6d6d]">{paypalAccount.email}</p>
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-sm text-[#6d6d6d] mb-4">No payment method connected</p>
-                <p className="text-xs text-[#6d6d6d]">Add your PayPal email in the earnings section to receive payments</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Account Actions */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="w-5 h-5 text-[#FF6E35]" />
-            <h2 className="text-lg font-semibold text-[#1a1a1a]">Account Actions</h2>
-          </div>
-          <p className="text-sm text-[#6d6d6d] mb-6">Additional account management options</p>
-          
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-2xl">
-            <div>
-              <h4 className="text-sm font-medium text-[#1a1a1a]">Change Password</h4>
-              <p className="text-xs text-[#6d6d6d]">Update your account password for security</p>
+              <Badge
+                className={`rounded-full text-xs ${
+                  paypalAccount.verified
+                    ? 'bg-[#00BDA6] text-white'
+                    : 'bg-[#E661FF]/15 text-[#E661FF]'
+                }`}
+              >
+                {paypalAccount.verified ? (
+                  <span className="inline-flex items-center"><CheckCircle className="h-3 w-3 mr-1" />Verified</span>
+                ) : (
+                  <span className="inline-flex items-center"><AlertCircle className="h-3 w-3 mr-1" />Pending</span>
+                )}
+              </Badge>
             </div>
-            <Button 
-              variant="outline" 
-              className="rounded-full border-gray-200"
-              onClick={() => {
-                supabase.auth.resetPasswordForEmail(user?.email || '')
-                toast.success('Password reset email sent!')
-              }}
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              Reset Password
-            </Button>
+          ) : (
+            <p className="text-sm text-[#6d6d6d]">
+              No PayPal connected. Add your PayPal email on the Earnings page to receive payouts.
+            </p>
+          )}
+        </section>
+
+        {/* Account actions */}
+        <section className="px-5 py-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Settings className="h-5 w-5 text-[#FF6E35]" />
+            <h2 className="text-sm font-semibold text-[#1a1a1a]">Account</h2>
           </div>
-        </div>
+
+          <div className="divide-y">
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <p className="text-sm font-medium text-[#1a1a1a]">Change password</p>
+                <p className="text-xs text-[#6d6d6d]">Receive a reset link via email</p>
+              </div>
+              <Button
+                variant="outline"
+                className="h-9 rounded-full border-gray-200"
+                onClick={() => {
+                  supabase.auth.resetPasswordForEmail(user?.email || '')
+                  toast.success('Password reset email sent!')
+                }}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Send link
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <p className="text-sm font-medium text-red-900">Sign out</p>
+                <p className="text-xs text-red-700">Log out of your account</p>
+              </div>
+              <Button
+                variant="outline"
+                className="h-9 rounded-full border-red-200 text-red-700 hover:bg-red-100"
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  toast.success('Signed out')
+                  window.location.href = '/login'
+                }}
+              >
+                Sign out
+              </Button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   )
