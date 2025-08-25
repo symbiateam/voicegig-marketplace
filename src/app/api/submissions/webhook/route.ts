@@ -174,7 +174,7 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'VoiceGig <noreply@theliva.ai>',
+          from: 'VoiceGig <onboarding@resend.dev>',
           to: [userEmail],
           subject,
           html,
