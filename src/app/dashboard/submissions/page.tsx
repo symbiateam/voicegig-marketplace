@@ -114,25 +114,25 @@ export default function SubmissionsPage() {
   }
 
   return (
-    <div className="py-4 max-w-[900px] mx-auto px-4">
-      <div className="mb-5 text-center">
-        <h1 className="text-[28px] font-bold mb-1 text-[#1a1a1a]">Your submissions</h1>
-        <p className="text-[#6d6d6d] text-sm">Hot right now!! Grab these before they're gone</p>
+    <div className="py-6 max-w-[1000px] mx-auto px-4">
+      <div className="mb-8">
+        <h1 className="text-[26px] font-bold text-[#1a1a1a]">Your submissions</h1>
+        <p className="text-sm text-[#6d6d6d]">Track your submitted work and earnings</p>
       </div>
 
-      {/* Tabs styled with category colors */}
+      {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="mb-6">
-        <TabsList className="flex gap-2 w-full justify-center bg-[var(--light-background)] p-1 rounded-full">
-          <TabsTrigger value="all" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-default)] data-[state=active]:text-white text-[var(--light-text)]">
+        <TabsList className="flex gap-2 w-full justify-center bg-gray-100 p-1 rounded-full">
+          <TabsTrigger value="all" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-[#1a1a1a] text-[#6d6d6d]">
             All ({submissions.length})
           </TabsTrigger>
-          <TabsTrigger value="approved" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-video)] data-[state=active]:text-white text-[var(--light-text)]">
+          <TabsTrigger value="approved" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[#00BDA6] data-[state=active]:text-white text-[#6d6d6d]">
             Accepted ({counts.approved})
           </TabsTrigger>
-          <TabsTrigger value="submitted" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-casual)] data-[state=active]:text-white text-[var(--light-text)]">
+          <TabsTrigger value="submitted" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[#E661FF] data-[state=active]:text-white text-[#6d6d6d]">
             Pending ({counts.submitted})
           </TabsTrigger>
-          <TabsTrigger value="rejected" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-[var(--category-emotion)] data-[state=active]:text-white text-[var(--light-text)]">
+          <TabsTrigger value="rejected" className="px-4 py-1.5 rounded-full text-sm font-medium data-[state=active]:bg-red-500 data-[state=active]:text-white text-[#6d6d6d]">
             Rejected ({counts.rejected})
           </TabsTrigger>
         </TabsList>
@@ -143,29 +143,29 @@ export default function SubmissionsPage() {
           <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
           <h3 className="text-lg font-medium text-[#1a1a1a] mb-1">No submissions yet</h3>
           <p className="text-sm text-[#6d6d6d] mb-4">Start by browsing available jobs and submitting your work.</p>
-          <Button asChild className="rounded-full bg-[var(--primary-color)] hover:bg-[var(--secondary-color)] text-white">
+          <Button asChild className="rounded-full bg-[#FF6E35] hover:bg-[#e55a2b] text-white">
             <Link href="/dashboard/jobs">Browse Jobs</Link>
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((s) => {
+        <div className="bg-white rounded-2xl border border-gray-200">
+          {filtered.map((s, idx) => {
             const meta = STATUS_META[s.status]
             return (
               <div
                 key={s.id}
-                className="flex items-center justify-between bg-white border border-[var(--border-color)] rounded-lg px-4 py-3 hover:bg-[var(--card-hover)] transition"
+                className={`flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition ${
+                  idx !== filtered.length - 1 ? 'border-b border-gray-100' : ''
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="text-xl">
-                    {s.jobs?.type === 'audio' ? <Mic2 className="h-5 w-5 text-[var(--category-audio)]" /> : <Video className="h-5 w-5 text-[var(--category-video)]" />}
+                    {s.jobs?.type === 'audio' ? <Mic2 className="h-5 w-5 text-[#FF6E35]" /> : <Video className="h-5 w-5 text-[#FF6E35]" />}
                   </div>
                   <div>
                     <h3 className="font-semibold text-sm text-[#1a1a1a]">{s.jobs?.title || 'Untitled job'}</h3>
-                    <div className="text-xs text-[var(--light-text)] flex gap-2">
+                    <div className="text-xs text-[#6d6d6d] flex gap-2">
                       <span>${s.jobs?.payment_amount ?? '-'}</span>
-                      <span>•</span>
-                      <span>1 min</span>
                       <span>•</span>
                       <span className="capitalize">{s.jobs?.type}</span>
                     </div>
@@ -176,7 +176,7 @@ export default function SubmissionsPage() {
                     {meta.icon}
                     {meta.label}
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-[#6d6d6d]">
                     {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                 </div>

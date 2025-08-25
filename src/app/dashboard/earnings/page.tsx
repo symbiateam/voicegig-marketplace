@@ -1,45 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import {
-  DollarSign,
-  TrendingUp,
-  CreditCard,
-  ExternalLink,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  ArrowUpRight,
-  Mail
-} from 'lucide-react'
+import { DollarSign, Clock, TrendingUp, ArrowUpRight, Mail } from 'lucide-react'
 
 type WalletBalance = {
   available: number
   pending: number
   total_earned: number
 }
-
-type Payout = {
-  id: string
-  user_id: string
-  amount: number
-  status: string
-  created_at: string
-  payout_method?: string
-  payout_email?: string
-  payout_id?: string
-}
-
-
 
 type PayPalPayoutBody = {
   amount: number
@@ -50,29 +25,39 @@ type PayPalPayoutBody = {
 export default function EarningsPage() {
   const { user } = useAuth()
   const [balance, setBalance] = useState<WalletBalance | null>(null)
-  const [payouts, setPayouts] = useState<Payout[]>([])
   const [loading, setLoading] = useState(true)
   const [payoutAmount, setPayoutAmount] = useState('')
   const [paypalEmail, setPaypalEmail] = useState('')
 
   const fetchEarningsData = useCallback(async () => {
     try {
-      // Fetch wallet balance
+      // Get wallet balance (available and total_earned)
       const { data: walletData } = await supabase
         .from('wallet_balances')
-        .select('*')
+        .select('available, total_earned')
         .eq('user_id', user?.id)
         .single()
 
-      // Fetch payouts
-      const { data: payoutsData } = await supabase
-        .from('payouts')
-        .select('*')
+      // Calculate pending from submissions directly
+      const { data: pendingSubmissions } = await supabase
+        .from('submissions')
+        .select(`
+          jobs (
+            payment_amount
+          )
+        `)
         .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
+        .eq('status', 'submitted')
 
-      setBalance(walletData)
-      setPayouts(payoutsData || [])
+      const pendingAmount = pendingSubmissions?.reduce((total, submission: any) => {
+        return total + (submission.jobs?.payment_amount || 0)
+      }, 0) || 0
+
+      setBalance({
+        available: walletData?.available || 0,
+        pending: pendingAmount,
+        total_earned: walletData?.total_earned || 0
+      })
     } catch (error) {
       console.error('Error fetching earnings data:', error)
     } finally {
@@ -87,10 +72,7 @@ export default function EarningsPage() {
         .select('paypal_email')
         .eq('id', user?.id)
         .single()
-
-      if (profile?.paypal_email) {
-        setPaypalEmail(profile.paypal_email)
-      }
+      if (profile?.paypal_email) setPaypalEmail(profile.paypal_email)
     } catch (error) {
       console.error('Error checking PayPal connection:', error)
     }
@@ -105,39 +87,16 @@ export default function EarningsPage() {
 
   const requestPayout = async () => {
     const amount = parseFloat(payoutAmount)
-
-    if (!amount || amount <= 0) {
-      toast.error('Please enter a valid amount')
-      return
-    }
-
-    if (!paypalEmail) {
-      toast.error('Please enter your PayPal email')
-      return
-    }
-
-    if (!balance || amount > balance.available) {
-      toast.error('Insufficient available balance')
-      return
-    }
+    if (!amount || amount <= 0) return toast.error('Please enter a valid amount')
+    if (!paypalEmail) return toast.error('Please enter your PayPal email')
+    if (!balance || amount > balance.available) return toast.error('Insufficient available balance')
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
+      const body: PayPalPayoutBody = { amount, email: paypalEmail, user_id: user?.id || '' }
+      await supabase.from('profiles').update({ paypal_email: paypalEmail }).eq('id', user?.id)
 
-      const endpoint = '/api/paypal/payout'
-      const body: PayPalPayoutBody = {
-        amount: amount,
-        email: paypalEmail,
-        user_id: user?.id || ''
-      }
-
-      // Save PayPal email to profile if it's new or changed
-      await supabase
-        .from('profiles')
-        .update({ paypal_email: paypalEmail })
-        .eq('id', user?.id)
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/paypal/payout', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
@@ -145,11 +104,7 @@ export default function EarningsPage() {
         },
         body: JSON.stringify(body),
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Payout request failed')
-      }
+      if (!response.ok) throw new Error('Payout request failed')
 
       toast.success('Payout request submitted successfully!')
       setPayoutAmount('')
@@ -162,20 +117,22 @@ export default function EarningsPage() {
 
   if (loading) {
     return (
-      <div className="container py-8">
-        <div className="h-8 w-48 bg-muted animate-pulse rounded mb-8"></div>
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
+      <div className="py-8 max-w-[1000px] mx-auto px-4">
+        <div className="h-8 w-48 bg-gray-200 animate-pulse rounded mb-8"></div>
+        <div className="bg-white rounded-2xl border border-gray-200">
           {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 w-16 bg-muted animate-pulse rounded"></div>
-                <div className="h-4 w-4 bg-muted animate-pulse rounded"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 w-20 bg-muted animate-pulse rounded mb-2"></div>
-                <div className="h-3 w-32 bg-muted animate-pulse rounded"></div>
-              </CardContent>
-            </Card>
+            <div key={i} className={`px-5 py-4 animate-pulse ${i !== 2 ? 'border-b border-gray-100' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-5 w-5 bg-gray-200 rounded" />
+                  <div className="h-4 w-24 bg-gray-200 rounded" />
+                </div>
+                <div className="text-right">
+                  <div className="h-4 w-16 bg-gray-200 rounded mb-1" />
+                  <div className="h-3 w-20 bg-gray-200 rounded" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -183,124 +140,91 @@ export default function EarningsPage() {
   }
 
   return (
-    <div className="container py-8">
+    <div className="py-6 max-w-[1000px] mx-auto px-4">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Earnings</h1>
-        <p className="text-muted-foreground">
-          Track your earnings and request payouts.
+        <h1 className="text-[26px] font-bold text-[#1a1a1a]">
+          ${balance?.total_earned?.toFixed(2) || '0.00'}
+        </h1>
+        <p className="text-sm text-[#6d6d6d]">Total Earnings</p>
+      </div>
+
+      {/* Earnings Breakdown */}
+      <div className="bg-white rounded-2xl border border-gray-200 mb-10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-[#00BDA6]" />
+            <span className="text-sm font-medium text-[#1a1a1a]">Available Balance</span>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold text-[#1a1a1a]">
+              ${balance?.available?.toFixed(2) || '0.00'}
+            </p>
+            <p className="text-xs text-[#6d6d6d]">Ready for payout</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-[#E661FF]" />
+            <span className="text-sm font-medium text-[#1a1a1a]">Pending</span>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold text-[#1a1a1a]">
+              ${balance?.pending?.toFixed(2) || '0.00'}
+            </p>
+            <p className="text-xs text-[#6d6d6d]">Under review</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-[#FF6E35]" />
+            <span className="text-sm font-medium text-[#1a1a1a]">Total Earned</span>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold text-[#1a1a1a]">
+              ${balance?.total_earned?.toFixed(2) || '0.00'}
+            </p>
+            <p className="text-xs text-[#6d6d6d]">All-time</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Payout Request */}
+      <div className="max-w-sm mx-auto space-y-3">
+        <h3 className="text-sm font-medium text-center text-[#1a1a1a]">Request Payout</h3>
+        
+        <Input
+          type="email"
+          placeholder="PayPal email"
+          value={paypalEmail}
+          onChange={(e) => setPaypalEmail(e.target.value)}
+          className="rounded-full text-sm border-gray-200"
+        />
+        
+        <Input
+          type="number"
+          placeholder="Amount"
+          value={payoutAmount}
+          onChange={(e) => setPayoutAmount(e.target.value)}
+          className="rounded-full text-sm border-gray-200 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          max={balance?.available || 0}
+          step="0.01"
+          min="0"
+        />
+        
+        <p className="text-xs text-[#6d6d6d] text-center">
+          Available: ${balance?.available?.toFixed(2) || '0.00'}
         </p>
-      </div>
 
-      {/* Balance Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${balance?.available?.toFixed(2) || '0.00'}</div>
-            <p className="text-xs text-muted-foreground">
-              Ready for payout
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${balance?.pending?.toFixed(2) || '0.00'}</div>
-            <p className="text-xs text-muted-foreground">
-              Under review
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${balance?.total_earned?.toFixed(2) || '0.00'}</div>
-            <p className="text-xs text-muted-foreground">
-              All-time earnings
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-8 md:grid-cols-2">
-        {/* Payout Request */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Request Payout</CardTitle>
-            <CardDescription>
-              Transfer your available balance to your PayPal account
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-4 mb-4">
-              <div>
-                <div className="space-y-2 mb-4">
-                  <Label>Payout Method</Label>
-                  <div className="flex items-center space-x-2 p-2 border rounded-md">
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    <span>PayPal</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="paypal-email">PayPal Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="paypal-email"
-                      type="email"
-                      placeholder="your-email@example.com"
-                      value={paypalEmail}
-                      onChange={(e) => setPaypalEmail(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="amount">Payout Amount</Label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="amount"
-                    type="number"
-                    placeholder="0.00"
-                    value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(e.target.value)}
-                    className="pl-9"
-                    max={balance?.available || 0}
-                    step="0.01"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Available: ${balance?.available?.toFixed(2) || '0.00'}
-                </p>
-              </div>
-            </div>
-
-            <Button
-              onClick={requestPayout}
-              disabled={!payoutAmount || parseFloat(payoutAmount) <= 0}
-              className="w-full"
-            >
-              <ArrowUpRight className="mr-2 h-4 w-4" />
-              Request Payout
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Payout History section removed as requested */}
+        <Button
+          onClick={requestPayout}
+          disabled={!payoutAmount || parseFloat(payoutAmount) <= 0}
+          className="w-full rounded-full bg-[#FF6E35] hover:bg-[#e55a2b] text-white"
+        >
+          Request Payout
+        </Button>
       </div>
     </div>
   )

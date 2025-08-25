@@ -127,106 +127,127 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container py-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Profile Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your account settings and payment preferences
-          </p>
-        </div>
+    <div className="py-6 max-w-[1000px] mx-auto px-4">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-[26px] font-bold text-[#1a1a1a]">Profile Settings</h1>
+        <p className="text-sm text-[#6d6d6d]">Manage your account settings and payment preferences</p>
+      </div>
 
+      <div className="space-y-6">
         {/* Profile Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="w-5 h-5" />
-              <span>Personal Information</span>
-            </CardTitle>
-            <CardDescription>
-              Update your personal details and contact information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleProfileUpdate} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="full_name">Your Name</Label>
-                  <Input
-                    id="full_name"
-                    value={profileData.full_name}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      full_name: e.target.value
-                    }))}
-                    placeholder="Enter your full name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profileData.email}
-                    disabled
-                    className="bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Email cannot be changed here. Contact support if needed.
-                  </p>
-                </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <User className="w-5 h-5 text-[#FF6E35]" />
+            <h2 className="text-lg font-semibold text-[#1a1a1a]">Personal Information</h2>
+          </div>
+          <p className="text-sm text-[#6d6d6d] mb-6">Update your personal details and contact information</p>
+          
+          <form onSubmit={handleProfileUpdate} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="full_name" className="text-sm font-medium text-[#1a1a1a]">Your Name</Label>
+                <Input
+                  id="full_name"
+                  value={profileData.full_name}
+                  onChange={(e) => setProfileData(prev => ({
+                    ...prev,
+                    full_name: e.target.value
+                  }))}
+                  placeholder="Enter your full name"
+                  className="rounded-full border-gray-200"
+                />
               </div>
-              <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Profile
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Payment Methods */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Methods</CardTitle>
-            <CardDescription>
-              Connect your PayPal account to receive earnings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* PayPal account connection */}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Account Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Actions</CardTitle>
-            <CardDescription>
-              Additional account management options
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h4 className="font-medium">Change Password</h4>
-                <p className="text-sm text-muted-foreground">
-                  Update your account password for security
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-[#1a1a1a]">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profileData.email}
+                  disabled
+                  className="rounded-full border-gray-200 bg-gray-50"
+                />
+                <p className="text-xs text-[#6d6d6d]">
+                  Email cannot be changed here. Contact support if needed.
                 </p>
               </div>
-              <Button variant="outline" onClick={() => {
-                // Trigger password reset email
+            </div>
+            <Button type="submit" disabled={loading} className="rounded-full bg-[#FF6E35] hover:bg-[#e55a2b] text-white">
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Update Profile
+            </Button>
+          </form>
+        </div>
+
+        {/* Payment Methods */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CreditCard className="w-5 h-5 text-[#FF6E35]" />
+            <h2 className="text-lg font-semibold text-[#1a1a1a]">Payment Methods</h2>
+          </div>
+          <p className="text-sm text-[#6d6d6d] mb-6">Connect your PayPal account to receive earnings</p>
+          
+          <div className="space-y-4">
+            {paypalAccount ? (
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#1a1a1a]">PayPal Account</p>
+                    <p className="text-xs text-[#6d6d6d]">{paypalAccount.email}</p>
+                  </div>
+                </div>
+                <Badge variant={paypalAccount.verified ? "default" : "secondary"} className="rounded-full">
+                  {paypalAccount.verified ? (
+                    <>
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Verified
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      Pending
+                    </>
+                  )}
+                </Badge>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-[#6d6d6d] mb-4">No payment method connected</p>
+                <p className="text-xs text-[#6d6d6d]">Add your PayPal email in the earnings section to receive payments</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Account Actions */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings className="w-5 h-5 text-[#FF6E35]" />
+            <h2 className="text-lg font-semibold text-[#1a1a1a]">Account Actions</h2>
+          </div>
+          <p className="text-sm text-[#6d6d6d] mb-6">Additional account management options</p>
+          
+          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-2xl">
+            <div>
+              <h4 className="text-sm font-medium text-[#1a1a1a]">Change Password</h4>
+              <p className="text-xs text-[#6d6d6d]">Update your account password for security</p>
+            </div>
+            <Button 
+              variant="outline" 
+              className="rounded-full border-gray-200"
+              onClick={() => {
                 supabase.auth.resetPasswordForEmail(user?.email || '')
                 toast.success('Password reset email sent!')
-              }}>
-                <Mail className="mr-2 h-4 w-4" />
-                Reset Password
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              }}
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Reset Password
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

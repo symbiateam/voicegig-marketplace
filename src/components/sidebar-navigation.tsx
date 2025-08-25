@@ -8,7 +8,6 @@ import {
   FileText, 
   Video, 
   Wallet, 
-  Bell, 
   Settings,
   User
 } from 'lucide-react'
@@ -64,22 +63,14 @@ export function SidebarNavigation() {
             </div>
           </Link>
           
-          {/* Notifications */}
-          <Link href="/dashboard/notifications" className="block w-full px-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full">
-              <Bell className="w-5 h-5 text-gray-700" />
-            </div>
-          </Link>
         </div>
       </div>
       
       <div className="mt-auto flex flex-col items-center gap-5 w-full">
         {/* Profile */}
         <Link href="/dashboard/profile" className="block w-full px-4">
-          <div className={`flex items-center justify-center ${isActive('/dashboard/profile') ? 'bg-[#f96f2f] shadow-sm ring-2 ring-[#ffbd9e] ring-opacity-50' : ''} rounded-full w-12 h-12`}>
-            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ">
-              <User className="w-5 h-5 text-gray-500" />
-            </div>
+          <div className={`flex items-center justify-center w-12 h-12 rounded-full ${isActive('/dashboard/profile') ? 'bg-[#f96f2f] shadow-sm ring-2 ring-[#ffbd9e] ring-opacity-50' : ''}`}>
+            <User className={`w-5 h-5 ${isActive('/dashboard/profile') ? 'text-white' : 'text-gray-700'}`} />
           </div>
         </Link>
         
