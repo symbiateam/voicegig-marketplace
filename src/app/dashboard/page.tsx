@@ -167,7 +167,7 @@ export default function DashboardPage() {
                     {job.title}
                   </h3>
                   <span className="text-xs font-semibold bg-[#FF6E35] text-white px-2 py-0.5 rounded-full">
-                    ${job.payment_amount}
+                    ${job.payment_amount}/min
                   </span>
                 </div>
 

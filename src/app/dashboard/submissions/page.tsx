@@ -165,7 +165,7 @@ export default function SubmissionsPage() {
                   <div>
                     <h3 className="font-semibold text-sm text-[#1a1a1a]">{s.jobs?.title || 'Untitled job'}</h3>
                     <div className="text-xs text-[#6d6d6d] flex gap-2">
-                      <span>${s.jobs?.payment_amount ?? '-'}</span>
+                      <span>${s.jobs?.payment_amount ?? '-'}/min</span>
                       <span>•</span>
                       <span className="capitalize">{s.jobs?.type}</span>
                     </div>
