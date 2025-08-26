@@ -484,19 +484,19 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
              job?.category === 'furniture' ? '🪑' : 
              job?.type === 'audio' ? '🎙️' : '📹'}
           </div>
-          <h1 className="text-2xl font-bold text-center">{job?.title}</h1>
+          <h1 className="text-3xl font-bold text-center">{job?.title}</h1>
         </div>
         
         {/* Task Description */}
         <div className="mb-8">
-          <p className="text-gray-600 mb-6 text-center">{job?.description}</p>
+          <p className="text-lg text-gray-600 mb-6 text-center">{job?.description}</p>
           
           {job?.requirements_text && (
             <div className="mt-6">
-              <h3 className="font-semibold mb-2">Requirements</h3>
+              <h3 className="text-lg font-semibold mb-2">Requirements</h3>
               <div className="space-y-1">
                 {job.requirements_text.split('\n').map((req, index) => (
-                  <p key={index} className="text-gray-600">{req}</p>
+                  <p key={index} className="text-base text-gray-600">{req}</p>
                 ))}
               </div>
             </div>
@@ -504,11 +504,11 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           
           {/* Reward Info */}
           <div className="mt-6">
-            <h3 className="font-semibold mb-2">Reward Info</h3>
+            <h3 className="text-lg font-semibold mb-2">Reward Info</h3>
             <div className="space-y-1">
-              <p className="text-gray-600">Payout: ${job?.payment_amount} per minute</p>
+              <p className="text-base text-gray-600">Payout: ${job?.payment_amount} per minute</p>
               {job?.estimated_time && (
-                <p className="text-gray-600">Maximum time per submission: {
+                <p className="text-base text-gray-600">Maximum time per submission: {
                   job.estimated_time < 1 
                     ? `${Math.round(job.estimated_time * 60)} seconds`
                     : job.estimated_time % 1 === 0
@@ -550,7 +550,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           </Button>
         </div>
         
-        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-8">How would you like to submit?</h2>
+        <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8">How would you like to submit?</h2>
         
         <div className="grid grid-cols-2 gap-4">
           {/* Upload Option */}
@@ -561,8 +561,8 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             <div className="flex flex-col items-center text-center gap-3">
               <Upload className="h-8 w-8" />
               <div>
-                <h3 className="font-medium mb-1">Upload File</h3>
-                <p className="text-xs opacity-90">
+                <h3 className="text-lg font-medium mb-1">Upload File</h3>
+                <p className="text-sm opacity-90">
                   Upload existing {job.type}
                 </p>
               </div>
@@ -577,8 +577,8 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             <div className="flex flex-col items-center text-center gap-3">
               <Mic2 className="h-8 w-8" />
               <div>
-                <h3 className="font-medium mb-1">Record Now</h3>
-                <p className="text-xs opacity-90">
+                <h3 className="text-lg font-medium mb-1">Record Now</h3>
+                <p className="text-sm opacity-90">
                   Record in browser
                 </p>
               </div>
@@ -605,7 +605,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           </Button>
         </div>
         
-        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-8">Upload {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
+        <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8">Upload {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
         
         {/* File Upload */}
         <div className="space-y-8">
@@ -624,10 +624,10 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
                 ) : (
                   <FileVideo className="mx-auto h-16 w-16 text-gray-400 mb-6" />
                 )}
-                <p className="text-lg text-gray-600 mb-2">
+                <p className="text-xl text-gray-600 mb-2">
                   Drop your {job.type} file here, or click to browse
                 </p>
-                <p className="text-sm text-gray-400">
+                <p className="text-base text-gray-400">
                   {job.type === 'audio' ? 'MP3, WAV, M4A' : 'MP4, MOV, AVI'} up to 100MB
                 </p>
               </label>
@@ -641,8 +641,8 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
                   <FileVideo className="h-10 w-10 text-[#ff6b35]" />
                 )}
                 <div>
-                  <p className="font-medium text-[#1a1a1a]">{selectedFile.name}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-lg font-medium text-[#1a1a1a]">{selectedFile.name}</p>
+                  <p className="text-base text-gray-500">
                     {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </div>
@@ -697,7 +697,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           </Button>
         </div>
         
-        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-8">Record {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
+        <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8">Record {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
         
         {/* Recording Interface */}
         <div className="space-y-8">
@@ -816,8 +816,8 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           <div className="mb-6"></div>
           
           {/* Success Message */}
-          <h2 className="text-2xl font-bold text-center mb-4">Submission sent!</h2>
-          <p className="text-center text-gray-600 mb-8 max-w-md">
+          <h2 className="text-3xl font-bold text-center mb-4">Submission sent!</h2>
+          <p className="text-lg text-center text-gray-600 mb-8 max-w-md">
             We'll review in 24 hrs. Keep an eye on your dashboard for updates.
           </p>
           
