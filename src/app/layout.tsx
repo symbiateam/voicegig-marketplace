@@ -1,10 +1,10 @@
 import React from 'react'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Nunito } from 'next/font/google'
 import './globals.css'
 import { Toaster } from 'sonner'
 
-const inter = Inter({ 
+const nunito = Nunito({ 
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700']
 })
@@ -24,7 +24,7 @@ export default function RootLayout({
       <head>
         <script src="https://www.paypalobjects.com/js/external/api.js"></script>
       </head>
-      <body className={inter.className}>
+      <body className={nunito.className}>
         {children}
         <Toaster richColors position="top-right" />
       </body>

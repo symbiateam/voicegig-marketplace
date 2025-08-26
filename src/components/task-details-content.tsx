@@ -42,11 +42,16 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   
   // Refs for recording
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const videoChunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   // Debug logging
   console.log("🚀 TaskDetailsContent loaded", {
@@ -219,31 +224,78 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
         URL.revokeObjectURL(audioUrl)
         setAudioUrl(null)
       }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl)
+        setVideoUrl(null)
+      }
       setAudioBlob(null)
+      setVideoBlob(null)
       audioChunksRef.current = []
+      videoChunksRef.current = []
       setRecordingTime(0)
       
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Request media access based on job type
+      const constraints = job?.type === 'video' 
+        ? { 
+            audio: true, 
+            video: { 
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user'
+            }
+          }
+        : { audio: true }
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      streamRef.current = stream
+      
+      // For video recording, show preview
+      if (job?.type === 'video' && videoRef.current) {
+        console.log('Setting up video preview', stream)
+        videoRef.current.srcObject = stream
+        
+        // Wait for metadata to load before playing
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(console.error)
+        }
+      }
+      
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       
       // Set up event handlers
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
+          if (job?.type === 'video') {
+            videoChunksRef.current.push(event.data)
+          } else {
+            audioChunksRef.current.push(event.data)
+          }
         }
       }
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
-        const url = URL.createObjectURL(audioBlob)
-        setAudioBlob(audioBlob)
-        setAudioUrl(url)
+        if (job?.type === 'video') {
+          const videoBlob = new Blob(videoChunksRef.current, { type: 'video/webm' })
+          const url = URL.createObjectURL(videoBlob)
+          setVideoBlob(videoBlob)
+          setVideoUrl(url)
+        } else {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+          const url = URL.createObjectURL(audioBlob)
+          setAudioBlob(audioBlob)
+          setAudioUrl(url)
+        }
         setIsRecording(false)
         
         // Stop all tracks in the stream
         stream.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+        
+        // Clear video preview
+        if (videoRef.current) {
+          videoRef.current.srcObject = null
+        }
       }
       
       // Start recording
@@ -257,7 +309,10 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       
     } catch (error) {
       console.error('Error starting recording:', error)
-      toast.error('Could not access microphone. Please check permissions.')
+      const errorMessage = job?.type === 'video' 
+        ? 'Could not access camera and microphone. Please check permissions.'
+        : 'Could not access microphone. Please check permissions.'
+      toast.error(errorMessage)
     }
   }
   
@@ -280,27 +335,34 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
   
   // Handle recording submission
   const handleRecordingSubmit = async () => {
-    if (!audioBlob || !job || !user) return
+    const recordingBlob = job?.type === 'video' ? videoBlob : audioBlob
+    if (!recordingBlob || !job || !user) return
     
     setUploading(true)
     
     try {
       // Convert blob to file
-      const file = new File([audioBlob], `recording-${Date.now()}.wav`, { type: 'audio/wav' })
+      const fileExtension = job.type === 'video' ? 'webm' : 'wav'
+      const mimeType = job.type === 'video' ? 'video/webm' : 'audio/wav'
+      const file = new File([recordingBlob], `recording-${Date.now()}.${fileExtension}`, { type: mimeType })
       
       console.log("🚀 Starting recording submission...", {
         fileSize: file.size,
         fileType: file.type,
+        jobType: job.type,
         jobId: job.id,
         userId: user.id
       })
       
+      // Determine storage bucket based on job type
+      const storageBucket = job.type === 'video' ? 'video' : 'audio'
+      
       // Upload to Supabase Storage
-      const fileName = `${user.id}/${job.id}-${Date.now()}.wav`
+      const fileName = `${user.id}/${job.id}-${Date.now()}.${fileExtension}`
       
       const { data: uploadData, error: uploadError } = await supabase
         .storage
-        .from('audio')
+        .from(storageBucket)
         .upload(fileName, file)
         
       if (uploadError) {
@@ -313,7 +375,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       // Get the public URL
       const { data: urlData } = supabase
         .storage
-        .from('audio')
+        .from(storageBucket)
         .getPublicUrl(fileName)
         
       const fileUrl = urlData?.publicUrl
@@ -327,7 +389,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             user_id: user.id,
             file_path: fileName,
             file_url: fileUrl,
-            file_type: 'audio',
+            file_type: job.type,
             notes: notes,
             status: 'submitted'
           }
@@ -346,7 +408,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       
     } catch (error) {
       console.error('Error submitting recording:', error)
-      toast.error('Failed to submit your recording. Please try again.')
+      toast.error(`Failed to submit your ${job?.type} recording. Please try again.`)
     } finally {
       setUploading(false)
     }
@@ -454,7 +516,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           className="w-full bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 rounded-full"
           size="lg"
         >
-          Continue recording
+          Continue
         </Button>
       </div>
     )
@@ -643,16 +705,36 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
         <div className="space-y-8">
           {/* Recording Controls */}
           <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-            {!audioUrl ? (
+            {(!audioUrl && !videoUrl) ? (
               <>
+                {/* Video Preview for Video Tasks */}
+                {job?.type === 'video' && (
+                  <div className="mb-6 w-full max-w-md">
+                    <video 
+                      ref={videoRef}
+                      className="w-full h-auto rounded-lg bg-black"
+                      muted
+                      autoPlay
+                      playsInline
+                      style={{ display: isRecording ? 'block' : 'none' }}
+                    />
+                  </div>
+                )}
+                
                 <div className="mb-6 text-center">
                   {isRecording ? (
                     <div className="text-2xl font-bold text-red-500">{formatTime(recordingTime)}</div>
                   ) : (
-                    <Mic2 className="mx-auto h-16 w-16 text-muted-foreground mb-2" />
+                    <>
+                      {job?.type === 'video' ? (
+                        <Video className="mx-auto h-16 w-16 text-muted-foreground mb-2" />
+                      ) : (
+                        <Mic2 className="mx-auto h-16 w-16 text-muted-foreground mb-2" />
+                      )}
+                    </>
                   )}
                   <p className="text-muted-foreground">
-                    {isRecording ? 'Recording in progress...' : 'Ready to record'}
+                    {isRecording ? 'Recording in progress...' : `Ready to record ${job?.type}`}
                   </p>
                 </div>
                 
@@ -678,14 +760,25 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             ) : (
               <>
                 <div className="w-full mb-6">
-                  <audio src={audioUrl} controls className="w-full" />
+                  {job?.type === 'video' && videoUrl ? (
+                    <video src={videoUrl} controls className="w-full max-w-md mx-auto rounded-lg" />
+                  ) : audioUrl ? (
+                    <audio src={audioUrl} controls className="w-full" />
+                  ) : null}
                 </div>
                 <div className="flex gap-4">
                   <Button 
                     onClick={() => {
-                      URL.revokeObjectURL(audioUrl)
-                      setAudioUrl(null)
-                      setAudioBlob(null)
+                      if (audioUrl) {
+                        URL.revokeObjectURL(audioUrl)
+                        setAudioUrl(null)
+                        setAudioBlob(null)
+                      }
+                      if (videoUrl) {
+                        URL.revokeObjectURL(videoUrl)
+                        setVideoUrl(null)
+                        setVideoBlob(null)
+                      }
                     }}
                     variant="outline"
                     className="rounded-full px-6"
@@ -712,7 +805,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           {/* Submit Button */}
           <Button
             onClick={handleRecordingSubmit}
-            disabled={!audioBlob || uploading}
+            disabled={(!audioBlob && !videoBlob) || uploading}
             className="w-full bg-[#ff6b35] hover:bg-[#ff5a1f] text-white"
             size="lg"
           >
@@ -724,7 +817,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             ) : (
               <>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                Submit Recording
+                Submit {job?.type === 'video' ? 'Video' : 'Recording'}
               </>
             )}
           </Button>
