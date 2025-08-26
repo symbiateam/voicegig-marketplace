@@ -45,7 +45,7 @@ export function TaskDetailsModal({ isOpen, onClose, children }: TaskDetailsModal
         ref={modalRef}
         className="relative bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white border-b">
+        <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-white">
           <div className="flex items-center">
            
             <h2 className="ml-3 text-xl font-semibold">Task Details</h2>

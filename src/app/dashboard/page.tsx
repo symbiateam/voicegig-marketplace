@@ -44,7 +44,12 @@ export default function DashboardPage() {
 
       const { data: submissions } = await supabase
         .from('submissions')
-        .select('status')
+        .select(`
+          status,
+          jobs (
+            payment_amount
+          )
+        `)
         .eq('user_id', user.id)
 
       const { data: jobsData } = await supabase
@@ -54,8 +59,14 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(6)
 
+      const totalEarnings = submissions?.reduce((total, submission: any) => {
+        return submission.status === 'approved' 
+          ? total + (submission.jobs?.payment_amount || 0)
+          : total
+      }, 0) || 0
+
       setStats({
-        totalEarnings: balanceData?.total_earned || 0,
+        totalEarnings: totalEarnings,
         approvedSubmissions: submissions?.filter(s => s.status === 'approved').length || 0,
         pendingSubmissions: submissions?.filter(s => s.status === 'submitted').length || 0,
       })
@@ -96,10 +107,10 @@ export default function DashboardPage() {
     <div className="py-6 max-w-[1000px] mx-auto px-4">
       {/* Welcome */}
       <div className="mb-8">
-        <h1 className="text-[26px] font-bold text-[#1a1a1a]">
+        <h1 className="text-[32px] font-bold text-[#1a1a1a]">
           Welcome back, {user?.user_metadata?.full_name || 'User'}
         </h1>
-        <p className="text-sm text-[#6d6d6d]">Here's your progress</p>
+        <p className="text-lg text-[#6d6d6d]">Here's your progress</p>
       </div>
 
       {/* Stat Tiles */}
@@ -107,37 +118,37 @@ export default function DashboardPage() {
         {/* Earnings */}
         <div className="bg-[#FF6E35] text-white rounded-3xl p-4 flex flex-col justify-between">
           <div>
-            <h3 className="text-sm opacity-90">Earnings so far</h3>
+            <h3 className="text-base opacity-90">Earnings so far</h3>
             <p className="text-3xl font-bold mt-1">${stats.totalEarnings.toFixed(2)}</p>
           </div>
           <Button
             asChild
-            className="mt-3 bg-white text-[#FF6E35] hover:bg-gray-100 rounded-full text-sm font-medium"
+            className="mt-3 bg-white text-[#FF6E35] hover:bg-gray-100 rounded-full text-base font-medium px-4 py-1 w-fit mx-auto"
           >
-            <Link href="/dashboard/earnings">Withdraw</Link>
+            <Link href="/dashboard/earnings">Cash Out</Link>
           </Button>
         </div>
 
         {/* Pending Review */}
         <div className="bg-[#E661FF] text-white rounded-3xl p-4 flex flex-col justify-center">
-          <h3 className="text-sm opacity-90">Pending Review</h3>
+          <h3 className="text-base opacity-90">Pending Review</h3>
           <p className="text-3xl font-bold mt-1">{stats.pendingSubmissions}</p>
-          <p className="text-xs opacity-80 mt-1">submissions</p>
+          <p className="text-sm opacity-80 mt-1">submissions</p>
         </div>
 
         {/* Accepted */}
         <div className="bg-[#00BDA6] text-white rounded-3xl p-4 flex flex-col justify-center">
-          <h3 className="text-sm opacity-90">Accepted</h3>
+          <h3 className="text-base opacity-90">Accepted</h3>
           <p className="text-3xl font-bold mt-1">{stats.approvedSubmissions}</p>
-          <p className="text-xs opacity-80 mt-1">submissions</p>
+          <p className="text-sm opacity-80 mt-1">submissions</p>
         </div>
       </div>
 
       {/* Featured Tasks */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[#1a1a1a]">Featured Tasks</h2>
-          <Button asChild variant="link" className="text-[#FF6E35] p-0 h-auto">
+          <h2 className="text-xl font-semibold text-[#1a1a1a]">Featured Tasks</h2>
+          <Button asChild variant="link" className="text-[#FF6E35] p-0 h-auto text-base">
             <Link href="/dashboard/jobs">View all</Link>
           </Button>
         </div>
@@ -152,16 +163,16 @@ export default function DashboardPage() {
               >
                 {/* Top row */}
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-medium text-[#1a1a1a] line-clamp-1">
+                  <h3 className="text-base font-medium text-[#1a1a1a] line-clamp-1">
                     {job.title}
                   </h3>
-                  <span className="text-xs font-semibold bg-[#FF6E35] text-white px-2 py-0.5 rounded-full">
-                    ${job.payment_amount}
+                  <span className="text-sm font-semibold bg-[#FF6E35] text-white px-2 py-0.5 rounded-full">
+                    ${job.payment_amount}/min
                   </span>
                 </div>
 
                 {/* Bottom row */}
-                <div className="flex items-center justify-between text-xs text-[#6d6d6d]">
+                <div className="flex items-center justify-between text-sm text-[#6d6d6d]">
                   <span className="capitalize">{job.type}</span>
                   <span>{getTimeAgo(job.created_at)}</span>
                 </div>

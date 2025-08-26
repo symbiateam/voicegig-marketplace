@@ -291,7 +291,7 @@ function JobCard({ job, onClick }: { job: Job, onClick: () => void }) {
           
           <div className="flex items-center justify-between mt-3">
             <div className="bg-[#00b286] flex items-center gap-1 px-2 py-0.5 rounded-lg text-white text-xs font-medium">
-              ${job.payment_amount}
+              ${job.payment_amount}/min
             </div>
             <span className="text-[10px] text-[#6d6d6d]">{getTimeAgo(job.created_at)}</span>
           </div>

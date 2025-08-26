@@ -8,38 +8,17 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/components/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { User, Mail, CreditCard, CheckCircle, AlertCircle, DollarSign, Settings, Loader2 } from 'lucide-react'
+import { User, Mail, Settings, Loader2 } from 'lucide-react'
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [paypalAccount, setPaypalAccount] = useState<{ email: string; verified: boolean } | null>(null)
   const [profileData, setProfileData] = useState({
     full_name: user?.user_metadata?.full_name || '',
     email: user?.email || '',
   })
 
-  const fetchAccountStatus = useCallback(async () => {
-    if (!user) return
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('paypal_email, paypal_verified')
-        .eq('id', user.id)
-        .single()
-
-      if (data?.paypal_email) {
-        setPaypalAccount({ email: data.paypal_email, verified: !!data.paypal_verified })
-      } else {
-        setPaypalAccount(null)
-      }
-    } catch (e) {
-      console.error(e)
-    }
-  }, [user])
-
-  useEffect(() => { if (user) fetchAccountStatus() }, [user, fetchAccountStatus])
 
   const handleProfileUpdate = async (e: FormEvent) => {
     e.preventDefault()
@@ -69,7 +48,7 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-[26px] font-bold text-[#1a1a1a]">Profile</h1>
-        <p className="text-sm text-[#6d6d6d]">Manage your info & payouts</p>
+        <p className="text-sm text-[#6d6d6d]">Manage your account information</p>
       </div>
 
       {/* Single flat container with only dividers */}
@@ -108,47 +87,8 @@ export default function ProfilePage() {
           </form>
         </section>
 
-        {/* Payment method */}
-        <section className="px-5 py-5 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-3">
-            <CreditCard className="h-5 w-5 text-[#FF6E35]" />
-            <h2 className="text-sm font-semibold text-[#1a1a1a]">Payment method</h2>
-          </div>
-
-          {paypalAccount ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#E6F8F4] flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-[#00BDA6]" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-[#1a1a1a]">PayPal</p>
-                  <p className="text-xs text-[#6d6d6d]">{paypalAccount.email}</p>
-                </div>
-              </div>
-              <Badge
-                className={`rounded-full text-xs ${
-                  paypalAccount.verified
-                    ? 'bg-[#00BDA6] text-white'
-                    : 'bg-[#E661FF]/15 text-[#E661FF]'
-                }`}
-              >
-                {paypalAccount.verified ? (
-                  <span className="inline-flex items-center"><CheckCircle className="h-3 w-3 mr-1" />Verified</span>
-                ) : (
-                  <span className="inline-flex items-center"><AlertCircle className="h-3 w-3 mr-1" />Pending</span>
-                )}
-              </Badge>
-            </div>
-          ) : (
-            <p className="text-sm text-[#6d6d6d]">
-              No PayPal connected. Add your PayPal email on the Earnings page to receive payouts.
-            </p>
-          )}
-        </section>
-
         {/* Account actions */}
-        <section className="px-5 py-5">
+        <section className="px-5 py-5 border-t border-gray-200">
           <div className="flex items-center gap-2 mb-3">
             <Settings className="h-5 w-5 text-[#FF6E35]" />
             <h2 className="text-sm font-semibold text-[#1a1a1a]">Account</h2>

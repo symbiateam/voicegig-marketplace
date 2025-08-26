@@ -138,7 +138,7 @@ export default function SubmissionsPage() {
         </TabsList>
       </Tabs>
 
-      {filtered.length === 0 ? (
+      {submissions.length === 0 ? (
         <div className="py-12 text-center">
           <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
           <h3 className="text-lg font-medium text-[#1a1a1a] mb-1">No submissions yet</h3>
@@ -146,6 +146,12 @@ export default function SubmissionsPage() {
           <Button asChild className="rounded-full bg-[#FF6E35] hover:bg-[#e55a2b] text-white">
             <Link href="/dashboard/jobs">Browse Jobs</Link>
           </Button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="py-12 text-center">
+          <div className="text-4xl mb-4">🔍</div>
+          <h3 className="text-lg font-medium text-[#1a1a1a] mb-1">No {tab === 'all' ? 'submissions' : STATUS_META[tab as Submission['status']]?.label.toLowerCase()} found</h3>
+          <p className="text-sm text-[#6d6d6d]">Try adjusting your search or check a different tab.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200">
@@ -165,7 +171,7 @@ export default function SubmissionsPage() {
                   <div>
                     <h3 className="font-semibold text-sm text-[#1a1a1a]">{s.jobs?.title || 'Untitled job'}</h3>
                     <div className="text-xs text-[#6d6d6d] flex gap-2">
-                      <span>${s.jobs?.payment_amount ?? '-'}</span>
+                      <span>${s.jobs?.payment_amount ?? '-'}/min</span>
                       <span>•</span>
                       <span className="capitalize">{s.jobs?.type}</span>
                     </div>

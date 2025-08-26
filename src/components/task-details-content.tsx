@@ -23,6 +23,7 @@ type Job = {
   requirements_text: string | null
   active: boolean
   created_at: string
+  estimated_time: number | null
 }
 
 interface TaskDetailsContentProps {
@@ -42,11 +43,16 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   
   // Refs for recording
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const videoChunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   // Debug logging
   console.log("🚀 TaskDetailsContent loaded", {
@@ -219,31 +225,78 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
         URL.revokeObjectURL(audioUrl)
         setAudioUrl(null)
       }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl)
+        setVideoUrl(null)
+      }
       setAudioBlob(null)
+      setVideoBlob(null)
       audioChunksRef.current = []
+      videoChunksRef.current = []
       setRecordingTime(0)
       
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Request media access based on job type
+      const constraints = job?.type === 'video' 
+        ? { 
+            audio: true, 
+            video: { 
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user'
+            }
+          }
+        : { audio: true }
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      streamRef.current = stream
+      
+      // For video recording, show preview
+      if (job?.type === 'video' && videoRef.current) {
+        console.log('Setting up video preview', stream)
+        videoRef.current.srcObject = stream
+        
+        // Wait for metadata to load before playing
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(console.error)
+        }
+      }
+      
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       
       // Set up event handlers
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
+          if (job?.type === 'video') {
+            videoChunksRef.current.push(event.data)
+          } else {
+            audioChunksRef.current.push(event.data)
+          }
         }
       }
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
-        const url = URL.createObjectURL(audioBlob)
-        setAudioBlob(audioBlob)
-        setAudioUrl(url)
+        if (job?.type === 'video') {
+          const videoBlob = new Blob(videoChunksRef.current, { type: 'video/webm' })
+          const url = URL.createObjectURL(videoBlob)
+          setVideoBlob(videoBlob)
+          setVideoUrl(url)
+        } else {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+          const url = URL.createObjectURL(audioBlob)
+          setAudioBlob(audioBlob)
+          setAudioUrl(url)
+        }
         setIsRecording(false)
         
         // Stop all tracks in the stream
         stream.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+        
+        // Clear video preview
+        if (videoRef.current) {
+          videoRef.current.srcObject = null
+        }
       }
       
       // Start recording
@@ -257,7 +310,10 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       
     } catch (error) {
       console.error('Error starting recording:', error)
-      toast.error('Could not access microphone. Please check permissions.')
+      const errorMessage = job?.type === 'video' 
+        ? 'Could not access camera and microphone. Please check permissions.'
+        : 'Could not access microphone. Please check permissions.'
+      toast.error(errorMessage)
     }
   }
   
@@ -280,27 +336,34 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
   
   // Handle recording submission
   const handleRecordingSubmit = async () => {
-    if (!audioBlob || !job || !user) return
+    const recordingBlob = job?.type === 'video' ? videoBlob : audioBlob
+    if (!recordingBlob || !job || !user) return
     
     setUploading(true)
     
     try {
       // Convert blob to file
-      const file = new File([audioBlob], `recording-${Date.now()}.wav`, { type: 'audio/wav' })
+      const fileExtension = job.type === 'video' ? 'webm' : 'wav'
+      const mimeType = job.type === 'video' ? 'video/webm' : 'audio/wav'
+      const file = new File([recordingBlob], `recording-${Date.now()}.${fileExtension}`, { type: mimeType })
       
       console.log("🚀 Starting recording submission...", {
         fileSize: file.size,
         fileType: file.type,
+        jobType: job.type,
         jobId: job.id,
         userId: user.id
       })
       
+      // Determine storage bucket based on job type
+      const storageBucket = job.type === 'video' ? 'video' : 'audio'
+      
       // Upload to Supabase Storage
-      const fileName = `${user.id}/${job.id}-${Date.now()}.wav`
+      const fileName = `${user.id}/${job.id}-${Date.now()}.${fileExtension}`
       
       const { data: uploadData, error: uploadError } = await supabase
         .storage
-        .from('audio')
+        .from(storageBucket)
         .upload(fileName, file)
         
       if (uploadError) {
@@ -313,7 +376,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       // Get the public URL
       const { data: urlData } = supabase
         .storage
-        .from('audio')
+        .from(storageBucket)
         .getPublicUrl(fileName)
         
       const fileUrl = urlData?.publicUrl
@@ -327,7 +390,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             user_id: user.id,
             file_path: fileName,
             file_url: fileUrl,
-            file_type: 'audio',
+            file_type: job.type,
             notes: notes,
             status: 'submitted'
           }
@@ -346,7 +409,7 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       
     } catch (error) {
       console.error('Error submitting recording:', error)
-      toast.error('Failed to submit your recording. Please try again.')
+      toast.error(`Failed to submit your ${job?.type} recording. Please try again.`)
     } finally {
       setUploading(false)
     }
@@ -421,41 +484,52 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
              job?.category === 'furniture' ? '🪑' : 
              job?.type === 'audio' ? '🎙️' : '📹'}
           </div>
-          <h1 className="text-2xl font-bold text-center">{job?.title}</h1>
+          <h1 className="text-3xl font-bold text-center">{job?.title}</h1>
         </div>
         
         {/* Task Description */}
         <div className="mb-8">
-          <p className="text-gray-600 mb-6 text-center">{job?.description}</p>
+          <p className="text-lg text-gray-600 mb-6 text-center">{job?.description}</p>
           
           {job?.requirements_text && (
             <div className="mt-6">
-              <h3 className="font-semibold mb-2">Requirements Checklist</h3>
-              <ul className="list-disc pl-6 space-y-1">
+              <h3 className="text-lg font-semibold mb-2">Requirements</h3>
+              <div className="space-y-1">
                 {job.requirements_text.split('\n').map((req, index) => (
-                  <li key={index}>{req}</li>
+                  <p key={index} className="text-base text-gray-600">{req}</p>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
           
           {/* Reward Info */}
           <div className="mt-6">
-            <h3 className="font-semibold mb-2">Reward Info</h3>
-            <ul className="space-y-1">
-              <li>Payout: ${job?.payment_amount}</li>
-            </ul>
+            <h3 className="text-lg font-semibold mb-2">Reward Info</h3>
+            <div className="space-y-1">
+              <p className="text-base text-gray-600">Payout: ${job?.payment_amount} per minute</p>
+              {job?.estimated_time && (
+                <p className="text-base text-gray-600">Maximum time per submission: {
+                  job.estimated_time < 1 
+                    ? `${Math.round(job.estimated_time * 60)} seconds`
+                    : job.estimated_time % 1 === 0
+                      ? `${job.estimated_time} minute${job.estimated_time !== 1 ? 's' : ''}`
+                      : `${Math.floor(job.estimated_time)} minute${Math.floor(job.estimated_time) !== 1 ? 's' : ''} and ${Math.round((job.estimated_time % 1) * 60)} seconds`
+                }</p>
+              )}
+            </div>
           </div>
         </div>
         
         {/* Continue Button */}
-        <Button 
-          onClick={handleContinue}
-          className="w-full bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 rounded-full"
-          size="lg"
-        >
-          Continue recording
-        </Button>
+        <div className="flex justify-center">
+          <Button 
+            onClick={handleContinue}
+            className="bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 px-8 rounded-full"
+            size="lg"
+          >
+            Continue
+          </Button>
+        </div>
       </div>
     )
   }
@@ -476,35 +550,39 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           </Button>
         </div>
         
-        <h2 className="text-2xl font-bold text-center mb-8">How would you like to submit?</h2>
+        <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8">How would you like to submit?</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-4">
           {/* Upload Option */}
           <div 
             onClick={() => setView('upload')}
-            className="border rounded-xl p-6 flex flex-col items-center justify-center gap-4 hover:border-primary hover:bg-primary/5 cursor-pointer transition-colors"
+            className="bg-[#FF6E35] text-white rounded-xl p-4 hover:bg-[#ff5a1f] transition cursor-pointer"
           >
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Upload className="h-8 w-8 text-primary" />
+            <div className="flex flex-col items-center text-center gap-3">
+              <Upload className="h-8 w-8" />
+              <div>
+                <h3 className="text-lg font-medium mb-1">Upload File</h3>
+                <p className="text-sm opacity-90">
+                  Upload existing {job.type}
+                </p>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold">Upload File</h3>
-            <p className="text-center text-gray-500">
-              Upload an existing {job.type === 'audio' ? 'audio' : 'video'} file from your device
-            </p>
           </div>
           
           {/* Record Option */}
           <div 
             onClick={() => setView('record')}
-            className="border rounded-xl p-6 flex flex-col items-center justify-center gap-4 hover:border-primary hover:bg-primary/5 cursor-pointer transition-colors"
+            className="bg-[#FF6E35] text-white rounded-xl p-4 hover:bg-[#ff5a1f] transition cursor-pointer"
           >
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Mic2 className="h-8 w-8 text-primary" />
+            <div className="flex flex-col items-center text-center gap-3">
+              <Mic2 className="h-8 w-8" />
+              <div>
+                <h3 className="text-lg font-medium mb-1">Record Now</h3>
+                <p className="text-sm opacity-90">
+                  Record in browser
+                </p>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold">Record Now</h3>
-            <p className="text-center text-gray-500">
-              Record {job.type === 'audio' ? 'audio' : 'video'} directly in your browser
-            </p>
           </div>
         </div>
       </div>
@@ -527,95 +605,77 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           </Button>
         </div>
         
-        <h2 className="text-2xl font-bold mb-6">Upload Your {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
+        <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8">Upload {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
         
         {/* File Upload */}
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <Label htmlFor="file-upload">
-              Upload {job.type === 'audio' ? 'Audio' : 'Video'} File
-            </Label>
-
-            {!selectedFile ? (
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept={job.type === 'audio' ? 'audio/*' : 'video/*'}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  {job.type === 'audio' ? (
-                    <FileAudio className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  ) : (
-                    <FileVideo className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  )}
-                  <h3 className="text-lg font-medium mb-2">
-                    Drop your {job.type} file here, or click to browse
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {job.type === 'audio' ? 'MP3, WAV, M4A' : 'MP4, MOV, AVI'} up to 100MB
+        <div className="space-y-8">
+          {!selectedFile ? (
+            <div className="bg-gray-100 rounded-lg p-12 text-center hover:bg-gray-50 transition-colors">
+              <input
+                id="file-upload"
+                type="file"
+                accept={job.type === 'audio' ? 'audio/*' : 'video/*'}
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <label htmlFor="file-upload" className="cursor-pointer block">
+                {job.type === 'audio' ? (
+                  <FileAudio className="mx-auto h-16 w-16 text-gray-400 mb-6" />
+                ) : (
+                  <FileVideo className="mx-auto h-16 w-16 text-gray-400 mb-6" />
+                )}
+                <p className="text-xl text-gray-600 mb-2">
+                  Drop your {job.type} file here, or click to browse
+                </p>
+                <p className="text-base text-gray-400">
+                  {job.type === 'audio' ? 'MP3, WAV, M4A' : 'MP4, MOV, AVI'} up to 100MB
+                </p>
+              </label>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between p-6 border border-gray-200 rounded-xl bg-gray-50">
+              <div className="flex items-center space-x-4">
+                {job.type === 'audio' ? (
+                  <FileAudio className="h-10 w-10 text-[#ff6b35]" />
+                ) : (
+                  <FileVideo className="h-10 w-10 text-[#ff6b35]" />
+                )}
+                <div>
+                  <p className="text-lg font-medium text-[#1a1a1a]">{selectedFile.name}</p>
+                  <p className="text-base text-gray-500">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
-                </label>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                <div className="flex items-center space-x-3">
-                  {job.type === 'audio' ? (
-                    <FileAudio className="h-8 w-8 text-primary" />
-                  ) : (
-                    <FileVideo className="h-8 w-8 text-primary" />
-                  )}
-                  <div>
-                    <p className="font-medium">{selectedFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={removeFile}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
               </div>
-            )}
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Additional Notes (Optional)</Label>
-            <Textarea
-              id="notes"
-              placeholder="Any additional information about your submission..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-            />
-          </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={removeFile}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
 
           {/* Submit Button */}
-          <Button
-            onClick={handleUploadSubmit}
-            disabled={!selectedFile || uploading}
-            className="w-full bg-[#ff6b35] hover:bg-[#ff5a1f] text-white"
-            size="lg"
-          >
-            {uploading ? (
-              <>
-                <Upload className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Submit Work
-              </>
-            )}
-          </Button>
+          <div className="flex justify-center">
+            <Button
+              onClick={handleUploadSubmit}
+              disabled={!selectedFile || uploading}
+              className="bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 px-12 rounded-full"
+              size="lg"
+            >
+              {uploading ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Submit'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -637,38 +697,54 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
           </Button>
         </div>
         
-        <h2 className="text-2xl font-bold mb-6">Record Your {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
+        <h2 className="text-3xl font-bold text-[#1a1a1a] mb-8">Record {job.type === 'audio' ? 'Audio' : 'Video'}</h2>
         
         {/* Recording Interface */}
         <div className="space-y-8">
           {/* Recording Controls */}
-          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-            {!audioUrl ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-gray-100 rounded-lg">
+            {(!audioUrl && !videoUrl) ? (
               <>
+                {/* Video Preview for Video Tasks */}
+                {job?.type === 'video' && (
+                  <div className="mb-6 w-full max-w-md">
+                    <video 
+                      ref={videoRef}
+                      className="w-full h-auto rounded-lg bg-black"
+                      muted
+                      autoPlay
+                      playsInline
+                      style={{ display: isRecording ? 'block' : 'none' }}
+                    />
+                  </div>
+                )}
+                
                 <div className="mb-6 text-center">
                   {isRecording ? (
                     <div className="text-2xl font-bold text-red-500">{formatTime(recordingTime)}</div>
                   ) : (
-                    <Mic2 className="mx-auto h-16 w-16 text-muted-foreground mb-2" />
+                    <>
+                      {job?.type === 'video' ? (
+                        <Video className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                      ) : (
+                        <Mic2 className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                      )}
+                    </>
                   )}
-                  <p className="text-muted-foreground">
-                    {isRecording ? 'Recording in progress...' : 'Ready to record'}
-                  </p>
                 </div>
                 
-                <div className="flex gap-4">
+                <div className="flex justify-center">
                   {!isRecording ? (
                     <Button 
                       onClick={startRecording}
-                      className="bg-red-500 hover:bg-red-600 text-white rounded-full px-8"
+                      className="bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 px-12 rounded-full"
                     >
                       Start Recording
                     </Button>
                   ) : (
                     <Button 
                       onClick={stopRecording}
-                      variant="outline"
-                      className="border-red-500 text-red-500 hover:bg-red-50 rounded-full px-8"
+                      className="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-12 rounded-full"
                     >
                       Stop Recording
                     </Button>
@@ -678,14 +754,25 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             ) : (
               <>
                 <div className="w-full mb-6">
-                  <audio src={audioUrl} controls className="w-full" />
+                  {job?.type === 'video' && videoUrl ? (
+                    <video src={videoUrl} controls className="w-full max-w-md mx-auto rounded-lg" />
+                  ) : audioUrl ? (
+                    <audio src={audioUrl} controls className="w-full" />
+                  ) : null}
                 </div>
                 <div className="flex gap-4">
                   <Button 
                     onClick={() => {
-                      URL.revokeObjectURL(audioUrl)
-                      setAudioUrl(null)
-                      setAudioBlob(null)
+                      if (audioUrl) {
+                        URL.revokeObjectURL(audioUrl)
+                        setAudioUrl(null)
+                        setAudioBlob(null)
+                      }
+                      if (videoUrl) {
+                        URL.revokeObjectURL(videoUrl)
+                        setVideoUrl(null)
+                        setVideoBlob(null)
+                      }
                     }}
                     variant="outline"
                     className="rounded-full px-6"
@@ -697,37 +784,24 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
             )}
           </div>
           
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Additional Notes (Optional)</Label>
-            <Textarea
-              id="notes"
-              placeholder="Any additional information about your recording..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-            />
-          </div>
-          
           {/* Submit Button */}
-          <Button
-            onClick={handleRecordingSubmit}
-            disabled={!audioBlob || uploading}
-            className="w-full bg-[#ff6b35] hover:bg-[#ff5a1f] text-white"
-            size="lg"
-          >
-            {uploading ? (
-              <>
-                <Upload className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Submit Recording
-              </>
-            )}
-          </Button>
+          <div className="flex justify-center">
+            <Button
+              onClick={handleRecordingSubmit}
+              disabled={(!audioBlob && !videoBlob) || uploading}
+              className="bg-[#ff6b35] hover:bg-[#ff5a1f] text-white font-medium py-3 px-12 rounded-full"
+              size="lg"
+            >
+              {uploading ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Submit'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -739,11 +813,11 @@ export function TaskDetailsContent({ jobId, onClose }: TaskDetailsContentProps) 
       <div className="max-w-3xl mx-auto p-6">
         <div className="flex flex-col items-center justify-center py-12">
           {/* Success Icon */}
-          <div className="text-6xl mb-6">✅</div>
+          <div className="mb-6"></div>
           
           {/* Success Message */}
-          <h2 className="text-2xl font-bold text-center mb-4">Submission sent!</h2>
-          <p className="text-center text-gray-600 mb-8 max-w-md">
+          <h2 className="text-3xl font-bold text-center mb-4">Submission sent!</h2>
+          <p className="text-lg text-center text-gray-600 mb-8 max-w-md">
             We'll review in 24 hrs. Keep an eye on your dashboard for updates.
           </p>
           
