@@ -123,9 +123,9 @@ export default function DashboardPage() {
           </div>
           <Button
             asChild
-            className="mt-3 bg-white text-[#FF6E35] hover:bg-gray-100 rounded-full text-sm font-medium"
+            className="mt-3 bg-white text-[#FF6E35] hover:bg-gray-100 rounded-full text-sm font-medium px-4 py-1 w-fit mx-auto"
           >
-            <Link href="/dashboard/earnings">Withdraw</Link>
+            <Link href="/dashboard/earnings">Cash Out</Link>
           </Button>
         </div>
 

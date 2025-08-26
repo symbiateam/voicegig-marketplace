@@ -36,8 +36,8 @@ export function SidebarNavigation() {
         <div className="flex flex-col gap-5 items-center w-full">
           {/* Home */}
           <Link href="/dashboard" className="block w-full px-4">
-            <div className={`flex items-center justify-center w-12 h-12 rounded-full ${isActive('/dashboard') && !isActive('/dashboard/jobs') && !isActive('/dashboard/earnings') && !isActive('/dashboard/profile') ? 'bg-[#f96f2f] shadow-sm ring-2 ring-[#ffbd9e] ring-opacity-50' : ''}`}>
-              <Home className={`w-5 h-5 ${isActive('/dashboard') && !isActive('/dashboard/jobs') && !isActive('/dashboard/earnings') && !isActive('/dashboard/profile') ? 'text-white' : 'text-gray-700'}`} />
+            <div className={`flex items-center justify-center w-12 h-12 rounded-full ${isActive('/dashboard') && !isActive('/dashboard/jobs') && !isActive('/dashboard/earnings') && !isActive('/dashboard/profile') && !isActive('/dashboard/submissions') ? 'bg-[#f96f2f] shadow-sm ring-2 ring-[#ffbd9e] ring-opacity-50' : ''}`}>
+              <Home className={`w-5 h-5 ${isActive('/dashboard') && !isActive('/dashboard/jobs') && !isActive('/dashboard/earnings') && !isActive('/dashboard/profile') && !isActive('/dashboard/submissions') ? 'text-white' : 'text-gray-700'}`} />
             </div>
           </Link>
           
