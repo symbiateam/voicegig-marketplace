@@ -31,32 +31,46 @@ export default function EarningsPage() {
 
   const fetchEarningsData = useCallback(async () => {
     try {
-      // Get wallet balance (available and total_earned)
-      const { data: walletData } = await supabase
-        .from('wallet_balances')
-        .select('available, total_earned')
-        .eq('user_id', user?.id)
-        .single()
-
-      // Calculate pending from submissions directly
-      const { data: pendingSubmissions } = await supabase
+      // Calculate total earnings from approved submissions
+      const { data: submissions } = await supabase
         .from('submissions')
         .select(`
+          status,
           jobs (
             payment_amount
           )
         `)
         .eq('user_id', user?.id)
-        .eq('status', 'submitted')
 
-      const pendingAmount = pendingSubmissions?.reduce((total, submission: any) => {
-        return total + (submission.jobs?.payment_amount || 0)
+      const totalEarned = submissions?.reduce((total, submission: any) => {
+        return submission.status === 'approved' 
+          ? total + (submission.jobs?.payment_amount || 0)
+          : total
       }, 0) || 0
 
+      const pendingAmount = submissions?.reduce((total, submission: any) => {
+        return submission.status === 'submitted'
+          ? total + (submission.jobs?.payment_amount || 0)
+          : total
+      }, 0) || 0
+
+      // Calculate available balance: total earned minus any payouts
+      const { data: payoutData } = await supabase
+        .from('ledger')
+        .select('amount')
+        .eq('user_id', user?.id)
+        .eq('type', 'debit')
+
+      const totalPayouts = payoutData?.reduce((total, entry) => {
+        return total + parseFloat(entry.amount)
+      }, 0) || 0
+
+      const availableBalance = Math.max(0, totalEarned - totalPayouts)
+
       setBalance({
-        available: walletData?.available || 0,
+        available: availableBalance,
         pending: pendingAmount,
-        total_earned: walletData?.total_earned || 0
+        total_earned: totalEarned
       })
     } catch (error) {
       console.error('Error fetching earnings data:', error)

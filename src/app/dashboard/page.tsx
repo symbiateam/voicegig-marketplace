@@ -44,7 +44,12 @@ export default function DashboardPage() {
 
       const { data: submissions } = await supabase
         .from('submissions')
-        .select('status')
+        .select(`
+          status,
+          jobs (
+            payment_amount
+          )
+        `)
         .eq('user_id', user.id)
 
       const { data: jobsData } = await supabase
@@ -54,8 +59,14 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(6)
 
+      const totalEarnings = submissions?.reduce((total, submission: any) => {
+        return submission.status === 'approved' 
+          ? total + (submission.jobs?.payment_amount || 0)
+          : total
+      }, 0) || 0
+
       setStats({
-        totalEarnings: balanceData?.total_earned || 0,
+        totalEarnings: totalEarnings,
         approvedSubmissions: submissions?.filter(s => s.status === 'approved').length || 0,
         pendingSubmissions: submissions?.filter(s => s.status === 'submitted').length || 0,
       })
